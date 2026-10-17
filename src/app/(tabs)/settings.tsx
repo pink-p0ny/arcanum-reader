@@ -130,7 +130,10 @@ export default function SettingsScreen() {
       <LargeTitle title="Settings" />
 
       <Section title="Account">
-        <Row label="Server" value={session?.serverUrl.replace(/^https?:\/\//, '')} />
+        <Row
+          label={session?.kind === 'booklore' ? 'Booklore server' : 'Grimmory server'}
+          value={session?.serverUrl.replace(/^https?:\/\//, '')}
+        />
         <Row label="User" value={session?.username} />
         <Row label={syncing ? 'Syncing…' : 'Sync Library Now'} onPress={syncing ? undefined : sync} />
         <Row label="Sign Out" onPress={confirmSignOut} destructive />

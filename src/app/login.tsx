@@ -46,7 +46,7 @@ export default function LoginScreen() {
             Arcanum
           </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-            Sign in to your library
+            Sign in to your Grimmory or Booklore server
           </ThemedText>
 
           <TextInput

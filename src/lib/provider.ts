@@ -1,4 +1,6 @@
+import { bookloreProvider } from './providers/booklore';
 import { grimmoryProvider } from './providers/grimmory';
+import { sessionStore } from './session';
 import type { LibraryProvider } from './providers/types';
 
 export type {
@@ -9,9 +11,10 @@ export type {
 } from './providers/types';
 
 /**
- * The library the app is signed in to. Grimmory is the only backend today; when a second one lands this
- * becomes a lookup on the stored account's kind, and the cache gains a provider column.
+ * The library the app is signed in to. The kind is detected at sign-in (see `login` in session.ts) and
+ * stored with the session; sessions from before detection existed default to Grimmory.
  */
 export function getProvider(): LibraryProvider {
-  return grimmoryProvider;
+  const kind = sessionStore.get().session?.kind ?? 'grimmory';
+  return kind === 'booklore' ? bookloreProvider : grimmoryProvider;
 }

@@ -3,8 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import { createStore } from './store';
 import type { AccessTokenDto } from './types';
 
+export type ServerKind = 'grimmory' | 'booklore';
+
 export interface Session {
   serverUrl: string;
+  /** Which API dialect the server speaks. Detected at sign-in; absent on sessions saved before detection. */
+  kind?: ServerKind;
   username: string;
   accessToken: string;
   refreshToken: string;
@@ -38,11 +42,17 @@ function jwtExpiryMs(token: string): number | null {
   }
 }
 
-function sessionFromTokens(serverUrl: string, username: string, dto: AccessTokenDto): Session {
+function sessionFromTokens(
+  serverUrl: string,
+  username: string,
+  dto: AccessTokenDto,
+  kind?: ServerKind,
+): Session {
   const fromJwt = jwtExpiryMs(dto.accessToken);
   const fromDto = dto.expires ? Date.now() + dto.expires * 1000 : null;
   return {
     serverUrl,
+    kind,
     username,
     accessToken: dto.accessToken,
     refreshToken: dto.refreshToken,
@@ -96,7 +106,22 @@ export async function login(serverUrlInput: string, username: string, password: 
   if (!res.ok)
     throw new ApiError(res.status, res.status === 401 ? 'Wrong username or password' : await readError(res));
   const dto = (await res.json()) as AccessTokenDto;
-  await persist(sessionFromTokens(serverUrl, username, dto));
+  await persist(sessionFromTokens(serverUrl, username, dto, await detectKind(serverUrl, dto.accessToken)));
+}
+
+/**
+ * Grimmory adds `/api/v1/app/*` mobile endpoints on top of Booklore's API. A server that answers 404 or 405
+ * there is plain Booklore. Network trouble during the probe assumes Grimmory, the richer dialect.
+ */
+async function detectKind(serverUrl: string, accessToken: string): Promise<ServerKind> {
+  try {
+    const res = await fetch(`${serverUrl}/api/v1/app/books?page=0&size=1`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    });
+    return res.status === 404 || res.status === 405 ? 'booklore' : 'grimmory';
+  } catch {
+    return 'grimmory';
+  }
 }
 
 export async function logout() {
@@ -123,7 +148,7 @@ export function refreshSession(): Promise<Session | null> {
       }
       if (!res.ok) throw new ApiError(res.status, await readError(res));
       const dto = (await res.json()) as AccessTokenDto;
-      const next = sessionFromTokens(current.serverUrl, current.username, dto);
+      const next = sessionFromTokens(current.serverUrl, current.username, dto, current.kind);
       await persist(next);
       return next;
     } finally {

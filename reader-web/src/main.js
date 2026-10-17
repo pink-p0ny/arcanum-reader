@@ -118,6 +118,10 @@ function wireView(v) {
 
   v.addEventListener('draw-annotation', (e) => {
     const { draw, annotation } = e.detail;
+    if (annotation.value.startsWith(SEARCH_PREFIX)) {
+      draw(Overlayer.highlight, { color: '#e8734a' });
+      return;
+    }
     if (annotation.value === ttsCfi) {
       draw(Overlayer.highlight, { color: settings?.dark ? '#3b82f6' : '#93c5fd' });
       return;
@@ -130,7 +134,7 @@ function wireView(v) {
 
   v.addEventListener('show-annotation', (e) => {
     const { value, range } = e.detail;
-    if (value === ttsCfi) return; // the read-aloud highlight is not a user annotation
+    if (value === ttsCfi || value.startsWith(SEARCH_PREFIX)) return; // not user annotations
     annotationTapped = true;
     setTimeout(() => (annotationTapped = false), 300);
     post({ type: 'annotationTap', cfi: value, rect: rectFor(range) });
@@ -230,7 +234,7 @@ function handleTap(doc, clientX, clientY, target) {
     if (annotationTapped) return;
     const overlayer = view?.renderer?.getContents?.().find((c) => c.doc === doc)?.overlayer;
     const [value, range] = overlayer?.hitTest({ x: clientX, y: clientY }) ?? [];
-    if (value && value !== ttsCfi) {
+    if (value && value !== ttsCfi && !value.startsWith(SEARCH_PREFIX)) {
       post({ type: 'annotationTap', cfi: value, rect: rectFor(range) });
       return;
     }
@@ -464,7 +468,51 @@ const handlers = {
     view?.deleteAnnotation({ value: cfi }).catch(() => {});
   },
   showAnnotation: ({ cfi }) => view?.showAnnotation({ value: cfi }).catch(() => {}),
+  search: ({ query, id }) => runSearch(query, id),
+  clearSearch: () => {
+    searchId += 1;
+    view?.clearSearch();
+  },
 };
+
+// ---------- search ----------
+
+const SEARCH_PREFIX = 'foliate-search:';
+let searchId = 0;
+
+/** Streams foliate's search generator to the app, grouped by chapter. A newer search cancels an older one. */
+async function runSearch(query, id) {
+  if (!view) return;
+  const mine = ++searchId;
+  const q = (query ?? '').trim();
+  if (!q) {
+    view.clearSearch();
+    post({ type: 'searchDone', id });
+    return;
+  }
+  try {
+    for await (const r of view.search({ query: q })) {
+      if (mine !== searchId) return; // superseded; leaving the loop closes the generator
+      if (r === 'done') break;
+      if (r.progress != null) post({ type: 'searchProgress', id, progress: r.progress });
+      if (r.subitems)
+        post({
+          type: 'searchResults',
+          id,
+          label: r.label ?? '',
+          items: r.subitems.map(({ cfi, excerpt }) => ({
+            cfi,
+            pre: excerpt?.pre ?? '',
+            match: excerpt?.match ?? '',
+            post: excerpt?.post ?? '',
+          })),
+        });
+    }
+    if (mine === searchId) post({ type: 'searchDone', id });
+  } catch (e) {
+    if (mine === searchId) post({ type: 'error', message: `Search failed: ${e?.message ?? e}` });
+  }
+}
 
 function onMessage(e) {
   let msg;

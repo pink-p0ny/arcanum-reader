@@ -219,6 +219,28 @@ console.log('tts next block:', block2.sentences.length, 'sentences');
 await send({ type: 'ttsStop' });
 messages.length = 0;
 
+// Search the whole book, then jump to the first hit and clear.
+await send({ type: 'search', query: 'Netherfield', id: 1 });
+const hits = await waitFor('searchResults', 20000, (m) => m.id === 1);
+const sdone = await waitFor('searchDone', 30000, (m) => m.id === 1);
+console.log(
+  'search:',
+  hits.items.length,
+  'hits in',
+  JSON.stringify(hits.label),
+  '| first:',
+  JSON.stringify(hits.items[0].match),
+  '| done:',
+  !!sdone,
+);
+if (!hits.items.length || !/netherfield/i.test(hits.items[0].match)) throw new Error('bad search hit');
+messages.length = 0;
+await send({ type: 'goTo', target: hits.items[0].cfi });
+await waitFor('relocate', 10000);
+await send({ type: 'clearSearch' });
+await settle(300);
+messages.length = 0;
+
 // Re-open at the saved CFI and confirm we land on the same spot.
 await send({
   type: 'open',

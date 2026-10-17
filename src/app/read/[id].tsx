@@ -16,6 +16,7 @@ import {
 } from '@/components/reader/reader-webview';
 import { SelectionBar } from '@/components/reader/selection-bar';
 import { SettingsSheet } from '@/components/reader/settings-sheet';
+import { SearchSheet, type SearchState } from '@/components/reader/search-sheet';
 import { TocSheet } from '@/components/reader/toc-sheet';
 import { TtsBar } from '@/components/reader/tts-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -79,6 +80,9 @@ export default function ReadScreen() {
   const [chrome, setChrome] = useState(true);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [showToc, setShowToc] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [search, setSearch] = useState<SearchState | null>(null);
+  const searchId = useRef(0);
   const [showSettings, setShowSettings] = useState(false);
   const [location, setLocation] = useState<{
     fraction: number;
@@ -228,6 +232,16 @@ export default function ReadScreen() {
           } else if (settings.flow === 'paginated' && e.x < 0.18) reader.current?.send({ type: 'prev' });
           else if (settings.flow === 'paginated' && e.x > 0.82) reader.current?.send({ type: 'next' });
           else setChrome((v) => !v);
+          break;
+        case 'searchResults':
+          if (e.id === searchId.current)
+            setSearch((s) => (s ? { ...s, groups: [...s.groups, { label: e.label, items: e.items }] } : s));
+          break;
+        case 'searchProgress':
+          if (e.id === searchId.current) setSearch((s) => (s ? { ...s, progress: e.progress } : s));
+          break;
+        case 'searchDone':
+          if (e.id === searchId.current) setSearch((s) => (s ? { ...s, progress: null } : s));
           break;
         case 'ttsBlock':
           tts.onBlock(e.sentences);
@@ -411,6 +425,9 @@ export default function ReadScreen() {
               <Pressable onPress={() => setShowToc(true)} hitSlop={10} style={styles.barButton}>
                 <ThemedText style={[styles.barAction, { color: fg }]}>☰</ThemedText>
               </Pressable>
+              <Pressable onPress={() => setShowSearch(true)} hitSlop={10} style={styles.barButton}>
+                <ThemedText style={[styles.barAction, { color: fg }]}>⌕</ThemedText>
+              </Pressable>
               <Pressable onPress={() => setShowSettings(true)} hitSlop={10} style={styles.barButton}>
                 <ThemedText style={[styles.barAction, { color: fg }]}>Aa</ThemedText>
               </Pressable>
@@ -487,6 +504,30 @@ export default function ReadScreen() {
         />
       ) : null}
 
+      <SearchSheet
+        visible={showSearch}
+        state={search}
+        onSearch={(query) => {
+          const id = ++searchId.current;
+          if (!query) {
+            setSearch(null);
+            reader.current?.send({ type: 'clearSearch' });
+            return;
+          }
+          setSearch({ query, groups: [], progress: 0 });
+          reader.current?.send({ type: 'search', query, id });
+        }}
+        onSelect={(cfi) => {
+          setShowSearch(false);
+          reader.current?.send({ type: 'goTo', target: cfi });
+        }}
+        onClear={() => {
+          searchId.current += 1;
+          setSearch(null);
+          reader.current?.send({ type: 'clearSearch' });
+        }}
+        onClose={() => setShowSearch(false)}
+      />
       <TocSheet
         visible={showToc}
         toc={toc}

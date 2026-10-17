@@ -38,6 +38,14 @@ export type ReaderEvent =
     }
   | { type: 'ttsBlock'; sentences: { mark: string | null; text: string }[] }
   | { type: 'ttsEnd' }
+  | {
+      type: 'searchResults';
+      id: number;
+      label: string;
+      items: { cfi: string; pre: string; match: string; post: string }[];
+    }
+  | { type: 'searchProgress'; id: number; progress: number }
+  | { type: 'searchDone'; id: number }
   | { type: 'error'; message: string };
 
 export interface TocItem {

@@ -1,3 +1,4 @@
+import { Platform, Settings } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 import { createStore } from './store';
@@ -32,9 +33,23 @@ const LOCAL_ONLY_KEY = 'arcanum.localOnly';
 
 export async function loadLocalOnly() {
   try {
-    localOnlyStore.set((await SecureStore.getItemAsync(LOCAL_ONLY_KEY)) === '1');
+    localOnlyStore.set(launchedLocalOnly() || (await SecureStore.getItemAsync(LOCAL_ONLY_KEY)) === '1');
   } catch {
     localOnlyStore.set(false);
+  }
+}
+
+/**
+ * `xcrun simctl launch <udid> net.snobunny.arcanum -arcanumLocalOnly 1` starts the app in folder-only
+ * mode without touching the keychain; iOS puts `-key value` launch arguments into NSUserDefaults, which
+ * React Native's Settings reads. Used by scripts/screenshots.sh.
+ */
+function launchedLocalOnly() {
+  if (Platform.OS !== 'ios') return false;
+  try {
+    return String(Settings.get('arcanumLocalOnly') ?? '') === '1';
+  } catch {
+    return false;
   }
 }
 

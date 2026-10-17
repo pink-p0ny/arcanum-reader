@@ -33,8 +33,19 @@
 - Booklore has no `/api/v1/app/*` endpoints; `src/lib/providers/booklore.ts` maps its `/api/v1/books` DTOs.
   The server kind is detected at sign-in (`detectKind` in session.ts) and stored on the session.
 - `scripts/asc.mjs` talks to the App Store Connect API with the key in `~/.appstoreconnect/private_keys/`
-  (never in the repo): `inspect`, `products`, `equalize <subId>`, `screenshots <png>`. Products: group
-  "Arcanum Premium" (display "Arcanum Cloud"), monthly/yearly subscriptions and a lifetime non-consumable.
+  (never in the repo): `inspect`, `products`, `equalize <subId>`, `screenshots <png>` (review screenshots
+  for the products), `listing` (pushes docs/app-store.md: subtitle, categories, description, keywords,
+  URLs, age rating; rerun after editing the doc) and `storeshots <dir>` (replaces the 13-inch and 11-inch
+  iPad screenshot sets from `13-*.png` / `11-*.png`). Products: group "Arcanum Premium" (display "Arcanum
+  Cloud"), monthly/yearly subscriptions and a lifetime non-consumable.
+- Store screenshots: `scripts/screenshots.sh <simulator build id> <epub dir> <out dir>` installs the EAS
+  `simulator` profile build on iPad Pro simulators, seeds a folder library (`scripts/screenshots-seed.py`
+  rewrites Gutenberg EPUB subjects to short genres and writes sidecars, reader settings and sessions),
+  launches with `-arcanumLocalOnly 1` (a launch argument `session.ts` reads through NSUserDefaults) and
+  captures Home, Library, a book page and the reader via `arcanum:///` deep links. The release builds on
+  the `preview`/`production` channels take JS over the air: `eas update --channel <c> --environment <c>
+  --platform ios` (web is not installed, so never `--platform all`).
+- TestFlight builds predating `expo-updates` (build 3) cannot take OTA updates; build 4 onward can.
 - Purchases go through RevenueCat (`src/lib/premium.ts`, entitlement `premium`, public key in app.json
   `extra.revenueCatIosKey`). `CLOUD_ENABLED` is `__DEV__` so Arcanum Cloud stays hidden in production until
   the hosted service exists. The folder library (`src/lib/library-folder.ts`) uses negative book ids;

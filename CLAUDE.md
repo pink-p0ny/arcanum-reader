@@ -32,3 +32,10 @@
   `npm test` (tsx); keep Expo imports out of those files. SQLite schema is at user_version 2 (sessions table).
 - Booklore has no `/api/v1/app/*` endpoints; `src/lib/providers/booklore.ts` maps its `/api/v1/books` DTOs.
   The server kind is detected at sign-in (`detectKind` in session.ts) and stored on the session.
+- `scripts/asc.mjs` talks to the App Store Connect API with the key in `~/.appstoreconnect/private_keys/`
+  (never in the repo): `inspect`, `products`, `equalize <subId>`, `screenshots <png>`. Products: group
+  "Arcanum Premium" (display "Arcanum Cloud"), monthly/yearly subscriptions and a lifetime non-consumable.
+- Purchases go through RevenueCat (`src/lib/premium.ts`, entitlement `premium`, public key in app.json
+  `extra.revenueCatIosKey`). `CLOUD_ENABLED` is `__DEV__` so Arcanum Cloud stays hidden in production until
+  the hosted service exists. The folder library (`src/lib/library-folder.ts`) uses negative book ids;
+  `getProvider(bookId)` routes them. iCloud needs the dev build (`modules/icloud-container`).

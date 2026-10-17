@@ -3,9 +3,11 @@ import { useStore } from '@/lib/store';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { AppState, useColorScheme } from 'react-native';
+import { AppState, Linking, useColorScheme } from 'react-native';
 
-import { loadSession, sessionStore } from '@/lib/session';
+import { importEpubs } from '@/lib/library-folder';
+import { syncLibrary } from '@/lib/library';
+import { loadLocalOnly, loadSession, localOnlyStore, sessionStore } from '@/lib/session';
 import { loadSettings } from '@/lib/settings';
 import { flushPending } from '@/lib/sync';
 
@@ -18,10 +20,11 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { ready, session } = useStore(sessionStore);
+  const localOnly = useStore(localOnlyStore);
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadSession(), loadSettings()])
+    Promise.all([loadSession(), loadSettings(), loadLocalOnly()])
       .catch(() => {})
       .finally(() => setBooted(true));
   }, []);
@@ -41,16 +44,32 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [session]);
 
+  // "Open in Arcanum": an EPUB handed over by Files, Mail or Safari lands in the library folder.
+  useEffect(() => {
+    if (!booted) return;
+    const handle = (url: string | null) => {
+      if (!url || !url.startsWith('file://') || !/\.epub$/i.test(url)) return;
+      importEpubs([url])
+        .then(() => syncLibrary())
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['library'] });
+          queryClient.invalidateQueries({ queryKey: ['home'] });
+        })
+        .catch(() => {});
+    };
+    Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+  }, [booted]);
+
   if (!booted || !ready) return null;
+  const signedIn = !!session || localOnly;
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
-          <Stack.Protected guard={!session}>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-          </Stack.Protected>
-          <Stack.Protected guard={!!session}>
+          <Stack.Protected guard={signedIn}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="book/[id]"
@@ -70,6 +89,12 @@ export default function RootLayout() {
                 presentation: 'fullScreenModal',
                 gestureEnabled: false,
               }}
+            />
+          </Stack.Protected>
+          <Stack.Protected guard={!session}>
+            <Stack.Screen
+              name="login"
+              options={{ headerShown: false, presentation: localOnly ? 'modal' : 'card' }}
             />
           </Stack.Protected>
         </Stack>

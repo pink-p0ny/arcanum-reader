@@ -12,7 +12,28 @@
       "supportsTablet": true,
       "bundleIdentifier": "net.snobunny.arcanum",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUbiquitousContainers": {
+          "iCloud.net.snobunny.arcanum": {
+            "NSUbiquitousContainerIsDocumentScopePublic": true,
+            "NSUbiquitousContainerName": "Arcanum",
+            "NSUbiquitousContainerSupportedFolderLevels": "Any"
+          }
+        },
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "EPUB book",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["org.idpf.epub-container"]
+          }
+        ],
+        "LSSupportsOpeningDocumentsInPlace": false
+      },
+      "usesIcloudStorage": true,
+      "entitlements": {
+        "com.apple.developer.icloud-container-identifiers": ["iCloud.net.snobunny.arcanum"],
+        "com.apple.developer.icloud-services": ["CloudDocuments"],
+        "com.apple.developer.ubiquity-container-identifiers": ["iCloud.net.snobunny.arcanum"]
       }
     },
     "android": {

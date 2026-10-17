@@ -26,6 +26,24 @@ export const sessionStore = createStore<{
   session: null,
 });
 
+/** True when the user chose to use Arcanum without a server (folder library only). */
+export const localOnlyStore = createStore<boolean>(false);
+const LOCAL_ONLY_KEY = 'arcanum.localOnly';
+
+export async function loadLocalOnly() {
+  try {
+    localOnlyStore.set((await SecureStore.getItemAsync(LOCAL_ONLY_KEY)) === '1');
+  } catch {
+    localOnlyStore.set(false);
+  }
+}
+
+export async function setLocalOnly(on: boolean) {
+  if (on) await SecureStore.setItemAsync(LOCAL_ONLY_KEY, '1');
+  else await SecureStore.deleteItemAsync(LOCAL_ONLY_KEY);
+  localOnlyStore.set(on);
+}
+
 export function normalizeServerUrl(input: string): string {
   let url = input.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;

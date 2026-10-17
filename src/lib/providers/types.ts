@@ -7,7 +7,7 @@ import type {
   UpdateAnnotationRequest,
 } from '../types';
 
-export type ProviderKind = 'grimmory' | 'booklore';
+export type ProviderKind = 'grimmory' | 'booklore' | 'folder';
 
 /** What a backend can do. Screens hide controls for anything a provider lacks. */
 export interface ProviderCapabilities {

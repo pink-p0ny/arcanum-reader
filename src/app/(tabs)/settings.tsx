@@ -18,7 +18,8 @@ import { useLibrarySync } from '@/lib/library';
 import { AI_MODELS, aiStore, ensureAiLoaded } from '@/lib/ai';
 import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
 import { clearSkips } from '@/lib/lucky';
-import { logout, sessionStore } from '@/lib/session';
+import { localOnlyStore, logout, sessionStore, setLocalOnly } from '@/lib/session';
+import { folderSupportsICloud, libraryFolder } from '@/lib/library-folder';
 import { DEFAULT_READER_SETTINGS, updateSettings } from '@/lib/settings';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -72,6 +73,21 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const session = useStore(sessionStore, (s) => s.session);
+  const localOnly = useStore(localOnlyStore);
+  const [folderInfo, setFolderInfo] = useState<string>('');
+  useEffect(() => {
+    libraryFolder()
+      .then(({ icloud }) =>
+        setFolderInfo(
+          icloud
+            ? 'iCloud Drive › Arcanum'
+            : folderSupportsICloud()
+              ? 'On this iPad (iCloud is off)'
+              : 'On this iPad',
+        ),
+      )
+      .catch(() => setFolderInfo('Unavailable'));
+  }, []);
   const ai = useStore(aiStore);
   const [showAi, setShowAi] = useState(false);
   const bindery = useStore(binderyStore);
@@ -129,14 +145,28 @@ export default function SettingsScreen() {
     >
       <LargeTitle title="Settings" />
 
-      <Section title="Account">
-        <Row
-          label={session?.kind === 'booklore' ? 'Booklore server' : 'Grimmory server'}
-          value={session?.serverUrl.replace(/^https?:\/\//, '')}
-        />
-        <Row label="User" value={session?.username} />
+      <Section title="Library">
+        {session ? (
+          <>
+            <Row
+              label={session.kind === 'booklore' ? 'Booklore server' : 'Grimmory server'}
+              value={session.serverUrl.replace(/^https?:\/\//, '')}
+            />
+            <Row label="User" value={session.username} />
+          </>
+        ) : (
+          <Row label="Sign In to a Server" onPress={() => router.push('/login')} />
+        )}
+        <Row label="Books Folder" value={folderInfo} />
         <Row label={syncing ? 'Syncing…' : 'Sync Library Now'} onPress={syncing ? undefined : sync} />
-        <Row label="Sign Out" onPress={confirmSignOut} destructive />
+        {session ? <Row label="Sign Out" onPress={confirmSignOut} destructive /> : null}
+        {!session && localOnly ? (
+          <Row label="Leave Folder-Only Mode" onPress={() => setLocalOnly(false)} destructive />
+        ) : null}
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Books in the folder show up alongside your server library. Drop EPUBs into it from any device, or
+          use Add Books on the Library tab.
+        </ThemedText>
       </Section>
 
       <Section title="Reading">

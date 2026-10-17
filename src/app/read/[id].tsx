@@ -118,7 +118,7 @@ export default function ReadScreen() {
         const summary = await getBook(bookId);
         let detail: AppBookDetail | null = null;
         try {
-          detail = await getProvider().bookDetail(bookId);
+          detail = await getProvider(bookId).bookDetail(bookId);
         } catch {}
         const epub =
           detail?.files?.find((f) => f.isBook && f.bookType === 'EPUB') ??

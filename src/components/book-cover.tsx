@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { useStore } from '@/lib/store';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -18,9 +19,13 @@ export const COVER_RATIO = 3 / 2;
 
 export function BookCover({ book, width, showProgress }: Props) {
   const theme = useTheme();
-  // Subscribing keeps covers fresh when the token rotates; the provider reads the credentials itself.
-  const session = useStore(sessionStore, (s) => s.session);
-  const source = session ? getProvider().coverSource(book) : null;
+  // Re-resolve when the token rotates; the provider reads the credentials itself.
+  const token = useStore(sessionStore, (s) => s.session?.accessToken);
+  const source = useMemo(
+    () => getProvider(book.id).coverSource(book),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book.id, book.coverUpdatedOn, token],
+  );
   const height = Math.round(width * COVER_RATIO);
   const progress = book.readProgress ?? 0;
 

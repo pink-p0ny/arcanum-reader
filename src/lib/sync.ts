@@ -26,13 +26,13 @@ export interface Position {
 }
 
 async function pushProgress(bookId: number, fileId: number | null, pos: Position, updatedAt: number) {
-  const provider = getProvider();
+  const provider = getProvider(bookId);
   if (provider.capabilities.progress) await provider.updateProgress(bookId, fileId, pos);
   await markProgressSynced(bookId, updatedAt);
 }
 
 /** The active provider's annotation API, or null for backends that keep highlights on the device only. */
-const remoteAnnotations = () => getProvider().annotations ?? null;
+const remoteAnnotations = (bookId: number) => getProvider(bookId).annotations ?? null;
 
 /** Save locally right away, then try to push. Failures stay queued for `flushPending`. */
 export async function saveProgress(bookId: number, fileId: number | null, pos: Position) {
@@ -80,7 +80,7 @@ export async function resolveStartPosition(
 // ---------- annotations ----------
 
 export async function loadAnnotations(bookId: number): Promise<LocalAnnotation[]> {
-  const remote = remoteAnnotations();
+  const remote = remoteAnnotations(bookId);
   if (remote) {
     try {
       const server = await remote.list(bookId);
@@ -105,7 +105,7 @@ export async function createAnnotation(input: {
     ...input,
     text: input.text.slice(0, 5000),
   });
-  const remote = remoteAnnotations();
+  const remote = remoteAnnotations(input.bookId);
   if (!remote) return local;
   try {
     const created = await remote.create({
@@ -130,7 +130,7 @@ export async function updateAnnotation(
   patch: { color?: string; style?: AnnotationStyle; note?: string },
 ) {
   await updateLocalAnnotation(a.localId, patch, 'update');
-  const remote = remoteAnnotations();
+  const remote = remoteAnnotations(a.bookId);
   if (remote && a.id > 0) {
     try {
       const updated = await remote.update(a.id, patch);
@@ -143,7 +143,7 @@ export async function updateAnnotation(
 
 export async function deleteAnnotation(a: LocalAnnotation) {
   await deleteLocalAnnotation(a.localId);
-  const remote = remoteAnnotations();
+  const remote = remoteAnnotations(a.bookId);
   if (remote && a.id > 0) {
     try {
       await remote.remove(a.id);
@@ -175,10 +175,10 @@ export async function flushPending() {
         if (isOfflineError(e)) return;
       }
     }
-    const remote = remoteAnnotations();
-    if (!remote) return;
     for (const row of await getAllPendingAnnotations()) {
       const a = JSON.parse(row.json) as Annotation;
+      const remote = remoteAnnotations(row.book_id);
+      if (!remote) continue;
       try {
         if (row.pending === 'create') {
           const created = await remote.create({

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { login } from '@/lib/session';
+import { localOnlyStore, login, setLocalOnly } from '@/lib/session';
+import { useStore } from '@/lib/store';
 
 export default function LoginScreen() {
   const theme = useTheme();
@@ -22,6 +24,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const localOnly = useStore(localOnlyStore);
+  const router = useRouter();
 
   const submit = async () => {
     if (!server.trim() || !username.trim() || !password) return;
@@ -29,6 +33,7 @@ export default function LoginScreen() {
     setError(null);
     try {
       await login(server, username.trim(), password);
+      if (localOnly) router.back();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -95,6 +100,15 @@ export default function LoginScreen() {
               <ThemedText style={styles.buttonText}>Sign In</ThemedText>
             )}
           </Pressable>
+          <Pressable
+            onPress={() => (localOnly ? router.back() : setLocalOnly(true).then(() => router.replace('/')))}
+            hitSlop={8}
+            style={styles.skip}
+          >
+            <ThemedText themeColor="textSecondary" style={styles.skipText}>
+              {localOnly ? 'Cancel' : 'No server? Use a folder of books instead'}
+            </ThemedText>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -123,6 +137,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: '#d33', textAlign: 'center' },
+  skip: { paddingVertical: Spacing.two },
+  skipText: { textAlign: 'center' },
   button: {
     height: 50,
     borderRadius: 12,

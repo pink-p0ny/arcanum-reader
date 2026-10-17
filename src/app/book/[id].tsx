@@ -64,7 +64,7 @@ export default function BookScreen() {
   });
   const detail = useQuery({
     queryKey: ['bookDetail', bookId],
-    queryFn: () => getProvider().bookDetail(bookId),
+    queryFn: () => getProvider(bookId).bookDetail(bookId),
     retry: false,
   });
   const download = useQuery({

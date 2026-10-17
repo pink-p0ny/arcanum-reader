@@ -13,7 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookCard } from '@/components/book-card';
 import { LargeTitle } from '@/components/large-title';
+import * as DocumentPicker from 'expo-document-picker';
+
 import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
+import { importEpubs } from '@/lib/library-folder';
 import { useStore } from '@/lib/store';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -44,6 +47,19 @@ export default function LibraryScreen() {
     sort,
   });
   const { sync, syncing } = useLibrarySync();
+
+  const addBooks = async () => {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: ['application/epub+zip', 'public.item'],
+      multiple: true,
+      copyToCacheDirectory: true,
+    });
+    if (res.canceled) return;
+    const uris = res.assets.filter((a) => /\.epub$/i.test(a.name)).map((a) => a.uri);
+    if (!uris.length) return;
+    await importEpubs(uris);
+    await sync();
+  };
 
   const books = useMemo(
     () => (category ? (data ?? []).filter((b) => (b.categories ?? []).includes(category)) : (data ?? [])),
@@ -90,13 +106,22 @@ export default function LibraryScreen() {
                     Clear
                   </ThemedText>
                 </Pressable>
-              ) : binderyReady ? (
-                <Pressable onPress={() => router.push('/request')} hitSlop={8}>
-                  <ThemedText type="small" style={styles.accent}>
-                    + Request
-                  </ThemedText>
-                </Pressable>
-              ) : undefined
+              ) : (
+                <View style={styles.actions}>
+                  <Pressable onPress={addBooks} hitSlop={8}>
+                    <ThemedText type="small" style={styles.accent}>
+                      + Add Books
+                    </ThemedText>
+                  </Pressable>
+                  {binderyReady ? (
+                    <Pressable onPress={() => router.push('/request')} hitSlop={8}>
+                      <ThemedText type="small" style={styles.accent}>
+                        + Request
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              )
             }
           />
           <TextInput
@@ -140,6 +165,7 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
+  actions: { flexDirection: 'row', gap: Spacing.three },
   content: { paddingHorizontal: Spacing.four, gap: Spacing.four },
   header: {
     gap: Spacing.two,

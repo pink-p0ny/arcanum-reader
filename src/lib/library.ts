@@ -2,7 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
 import { isOfflineError } from './api';
+import { folderProvider } from './library-folder';
 import { getProvider } from './provider';
+import { sessionStore } from './session';
 import { deleteBooksNotIn, getBooks, kvGet, kvSet, upsertBooks, type LibrarySort } from './db';
 import type { AppBookSummary } from './types';
 
@@ -11,13 +13,20 @@ const PAGE = 200;
 /** Pull the whole catalog into SQLite. Safe to call often; it replaces the cache atomically per page. */
 export async function syncLibrary(): Promise<{ count: number }> {
   const ids: number[] = [];
-  let page = 0;
-  for (;;) {
-    const res = await getProvider().listBooks(page, PAGE);
-    await upsertBooks(res.items);
-    ids.push(...res.items.map((b) => b.id));
-    if (!res.hasNext) break;
-    page += 1;
+  // The folder library first: it is local and never fails for network reasons.
+  const folder = await folderProvider.listBooks(0, PAGE);
+  await upsertBooks(folder.items);
+  ids.push(...folder.items.map((b) => b.id));
+
+  if (sessionStore.get().session) {
+    let page = 0;
+    for (;;) {
+      const res = await getProvider().listBooks(page, PAGE);
+      await upsertBooks(res.items);
+      ids.push(...res.items.map((b) => b.id));
+      if (!res.hasNext) break;
+      page += 1;
+    }
   }
   await deleteBooksNotIn(ids);
   await kvSet('librarySyncedAt', Date.now());

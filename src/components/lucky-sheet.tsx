@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { BookCover } from '@/components/book-cover';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { aiStore } from '@/lib/ai';
 import { bestRating } from '@/lib/home';
 import { authorsLine } from '@/lib/library';
 import { drawLucky, skipBook, type LuckyPick } from '@/lib/lucky';
+import { useStore } from '@/lib/store';
 
 interface Props {
   visible: boolean;
@@ -27,9 +29,11 @@ export function LuckySheet({ visible, onClose }: Props) {
 function LuckyBody({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
   const router = useRouter();
+  const ai = useStore(aiStore, (s) => s.mode === 'byok' && s.hasKey);
   const [pick, setPick] = useState<LuckyPick | null | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const [tries, setTries] = useState(0);
+  const [mood, setMood] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -41,11 +45,11 @@ function LuckyBody({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  const another = async () => {
-    if (!pick || drawing) return;
+  const redraw = async (skipCurrent: boolean) => {
+    if (drawing) return;
     setDrawing(true);
-    await skipBook(pick.book.id);
-    const next = await drawLucky(pick.book.id);
+    if (skipCurrent && pick) await skipBook(pick.book.id);
+    const next = await drawLucky(pick?.book.id ?? null, { mood });
     setPick(next);
     setTries((n) => n + 1);
     setDrawing(false);
@@ -86,7 +90,25 @@ function LuckyBody({ onClose }: { onClose: () => void }) {
           </ThemedText>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          {ai ? (
+            <View style={[styles.moodRow, { backgroundColor: theme.backgroundElement }]}>
+              <TextInput
+                value={mood}
+                onChangeText={setMood}
+                placeholder="In the mood for… (optional)"
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.moodInput, { color: theme.text }]}
+                returnKeyType="search"
+                onSubmitEditing={() => redraw(false)}
+                editable={!drawing}
+              />
+              <Pressable onPress={() => redraw(false)} disabled={drawing} hitSlop={8}>
+                <ThemedText style={[styles.link, drawing && styles.disabled]}>Ask</ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
+
           <View style={[styles.cover, { opacity: drawing ? 0.4 : 1 }]}>
             <BookCover book={pick.book} width={180} />
           </View>
@@ -99,33 +121,35 @@ function LuckyBody({ onClose }: { onClose: () => void }) {
               ? ` · ${pick.book.seriesName}${pick.book.seriesNumber ? ` #${pick.book.seriesNumber}` : ''}`
               : ''}
           </ThemedText>
-          {rating > 0 ? (
+          {rating > 0 || pick.book.categories?.length ? (
             <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-              ★ {rating.toFixed(1)}
-              {pick.book.categories?.length ? ` · ${pick.book.categories.slice(0, 3).join(', ')}` : ''}
-            </ThemedText>
-          ) : pick.book.categories?.length ? (
-            <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-              {pick.book.categories.slice(0, 3).join(', ')}
+              {rating > 0 ? `★ ${rating.toFixed(1)}` : ''}
+              {rating > 0 && pick.book.categories?.length ? ' · ' : ''}
+              {pick.book.categories?.slice(0, 3).join(', ') ?? ''}
             </ThemedText>
           ) : null}
 
           <View style={[styles.why, { backgroundColor: theme.backgroundElement }]}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.whyTitle}>
-              Why this one
+              {pick.source === 'ai' ? 'Picked for you by Claude' : 'Why this one'}
             </ThemedText>
             {pick.reasons.map((r) => (
               <ThemedText key={r} type="small">
-                · {r}
+                {pick.source === 'ai' ? r : `· ${r}`}
               </ThemedText>
             ))}
+            {pick.aiError ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.error}>
+                AI pick unavailable ({pick.aiError}). This one is from the local draw.
+              </ThemedText>
+            ) : null}
           </View>
 
           <Pressable onPress={start} disabled={drawing} style={[styles.primary, drawing && styles.disabled]}>
             <ThemedText style={styles.primaryText}>Start Reading</ThemedText>
           </Pressable>
           <Pressable
-            onPress={another}
+            onPress={() => redraw(true)}
             disabled={drawing}
             style={[
               styles.secondary,
@@ -166,6 +190,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.five,
     paddingBottom: Spacing.six,
   },
+  moodRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 4,
+  },
+  moodInput: { flex: 1, fontSize: 16, paddingVertical: 8 },
   cover: { marginVertical: Spacing.three },
   center: { textAlign: 'center' },
   why: {
@@ -176,6 +210,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.three,
   },
   whyTitle: { textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  error: { marginTop: 4, fontStyle: 'italic' },
   primary: {
     alignSelf: 'stretch',
     alignItems: 'center',

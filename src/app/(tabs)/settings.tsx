@@ -1,9 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@/lib/store';
+import { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AiSettingsSheet } from '@/components/ai-settings-sheet';
 import { LargeTitle } from '@/components/large-title';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -11,6 +13,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { clearLocalData, getBook, getDownloads } from '@/lib/db';
 import { booksDir, deleteDownload, formatBytes } from '@/lib/downloads';
 import { useLibrarySync } from '@/lib/library';
+import { AI_MODELS, aiStore, ensureAiLoaded } from '@/lib/ai';
 import { clearSkips } from '@/lib/lucky';
 import { logout, sessionStore } from '@/lib/session';
 import { DEFAULT_READER_SETTINGS, updateSettings } from '@/lib/settings';
@@ -65,6 +68,17 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const session = useStore(sessionStore, (s) => s.session);
+  const ai = useStore(aiStore);
+  const [showAi, setShowAi] = useState(false);
+  useEffect(() => {
+    ensureAiLoaded();
+  }, []);
+  const aiSummary =
+    ai.mode === 'byok'
+      ? ai.hasKey
+        ? `Own key · ${AI_MODELS.find((m) => m.id === ai.model)?.label ?? ai.model}`
+        : 'Own key · not set'
+      : 'Off';
   const { sync, syncing } = useLibrarySync();
   const qc = useQueryClient();
   const downloads = useQuery({
@@ -124,6 +138,15 @@ export default function SettingsScreen() {
           Fonts, margins and themes are adjusted inside the reader with the Aa button.
         </ThemedText>
       </Section>
+
+      <Section title="AI Services">
+        <Row label="AI Picks" value={aiSummary} onPress={() => setShowAi(true)} />
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Optional. Bring your own Anthropic key today; hosted and self-hosted Arcanum Server options come
+          with the next release.
+        </ThemedText>
+      </Section>
+      <AiSettingsSheet visible={showAi} onClose={() => setShowAi(false)} />
 
       <Section title={`Downloads · ${formatBytes(totalBytes) || '0 KB'}`}>
         {(downloads.data ?? []).length === 0 ? (

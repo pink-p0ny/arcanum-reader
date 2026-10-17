@@ -65,6 +65,12 @@ const META_KEY = 'folderMeta';
 const metaCache = new Map<number, CachedMeta>();
 let metaLoaded: Promise<void> | null = null;
 
+/**
+ * Covers resolve synchronously from the cached metadata, so the cache is loaded at app start; otherwise a
+ * launch that skips the sync (within five minutes of the last one) shows folder books without covers.
+ */
+export const loadFolderMeta = () => ensureMetaLoaded();
+
 function ensureMetaLoaded() {
   if (!metaLoaded) {
     metaLoaded = kvGet<[number, CachedMeta][]>(META_KEY).then((rows) => {

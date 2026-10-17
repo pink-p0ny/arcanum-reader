@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, useColorScheme } from 'react-native';
 
-import { importEpubs } from '@/lib/library-folder';
+import { importEpubs, loadFolderMeta } from '@/lib/library-folder';
 import { syncLibrary } from '@/lib/library';
 import { loadLocalOnly, loadSession, localOnlyStore, sessionStore } from '@/lib/session';
 import { ensureHiddenGenresLoaded } from '@/lib/genres';
@@ -26,7 +26,13 @@ export default function RootLayout() {
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadSession(), loadSettings(), loadLocalOnly(), ensureHiddenGenresLoaded()])
+    Promise.all([
+      loadSession(),
+      loadSettings(),
+      loadLocalOnly(),
+      ensureHiddenGenresLoaded(),
+      loadFolderMeta().catch(() => {}),
+    ])
       .catch(() => {})
       .finally(() => setBooted(true));
   }, []);

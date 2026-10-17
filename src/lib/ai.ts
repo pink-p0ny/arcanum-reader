@@ -94,7 +94,8 @@ export interface AiPickResult {
 const SYSTEM = `You help a reader who finds it hard to choose their next book. From the candidate list, pick exactly one
 to start right now. Weigh their taste summary heavily, and if they state a mood, treat it as the deciding
 factor. Occasionally choose a well-rated outlier so the picks do not get stale. Give a reason in the second
-person, at most 30 words, warm and specific, with no spoilers. Answer only by calling the pick_book tool.`;
+person, at most 30 words, warm and specific, with no spoilers. Always answer by calling the pick_book tool; never
+reply in prose.`;
 
 class AiError extends Error {}
 
@@ -158,12 +159,26 @@ export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
           },
         },
       ],
-      tool_choice: { type: 'tool', name: 'pick_book' },
+      tool_choice: { type: 'auto' },
     },
     key,
   );
-  const block = (json?.content ?? []).find((b: { type: string }) => b.type === 'tool_use');
-  const input = block?.input as Partial<AiPickResult> | undefined;
+  const content: { type: string; input?: unknown; text?: string }[] = json?.content ?? [];
+  const block = content.find((b) => b.type === 'tool_use');
+  let input = block?.input as Partial<AiPickResult> | undefined;
+  if (!input) {
+    // The model answered in prose; accept a JSON object with bookId and reason if it included one.
+    const text = content
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n');
+    const m = text.match(/\{[\s\S]*?"bookId"[\s\S]*?\}/);
+    if (m) {
+      try {
+        input = JSON.parse(m[0]);
+      } catch {}
+    }
+  }
   if (!input || typeof input.bookId !== 'number') throw new AiError('The model did not return a pick.');
   const ok = req.candidates.some((c) => c.id === input.bookId);
   if (!ok) throw new AiError('The model chose a book that was not offered.');

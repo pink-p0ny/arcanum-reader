@@ -27,6 +27,7 @@ import { downloadBook, downloadsStore, localBookFile } from '@/lib/downloads';
 import { readerPageUri } from '@/lib/reader-asset';
 import { resolveReaderSettings } from '@/lib/reader-theme';
 import { settingsStore } from '@/lib/settings';
+import { SessionTracker } from '@/lib/stats';
 import { TtsController, ttsStore } from '@/lib/tts';
 import { addEditMenuListener, editMenuAvailable, setEditMenuItems } from '../../../modules/webview-edit-menu';
 import {
@@ -156,6 +157,12 @@ export default function ReadScreen() {
     return () => tts.stop();
   }, [tts]);
 
+  // Reading time for the stats card; stops (and records) when the screen unmounts.
+  useEffect(() => {
+    const tracker = new SessionTracker(bookId);
+    return () => tracker.stop();
+  }, [bookId]);
+
   // ---- progress ----
   const persist = useCallback(
     (pos: Position) => {
@@ -187,6 +194,7 @@ export default function ReadScreen() {
       });
     qc.invalidateQueries({ queryKey: ['library'] });
     qc.invalidateQueries({ queryKey: ['home'] });
+    qc.invalidateQueries({ queryKey: ['stats'] });
     qc.invalidateQueries({ queryKey: ['book', bookId] });
     qc.invalidateQueries({ queryKey: ['annotations', bookId] });
     flushPending().catch(() => {});

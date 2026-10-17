@@ -6,18 +6,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GenreChips } from '@/components/genre-chips';
 import { LargeTitle } from '@/components/large-title';
 import { LuckySheet } from '@/components/lucky-sheet';
+import { ReadingStatsCard } from '@/components/reading-stats-card';
 import { ShelfRow } from '@/components/shelf-row';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useHome } from '@/lib/home';
 import { lastSyncedAt, useLibrarySync } from '@/lib/library';
+import { useReadingStats } from '@/lib/stats';
 
 export default function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data, isLoading, refetch } = useHome();
   const { sync, syncing, error } = useLibrarySync();
+  const stats = useReadingStats();
   const didInitialSync = useRef(false);
   const [showLucky, setShowLucky] = useState(false);
 
@@ -33,7 +36,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [refetch]),
+      stats.refetch();
+    }, [refetch, stats]),
   );
 
   return (
@@ -84,6 +88,7 @@ export default function HomeScreen() {
         </View>
       ) : data ? (
         <View style={styles.sections}>
+          {stats.data ? <ReadingStatsCard stats={stats.data} /> : null}
           <ShelfRow title="Continue Reading" books={data.continueReading} coverWidth={150} />
           {data.genres.length > 0 ? <GenreChips genres={data.genres} /> : null}
           {data.sections.map((s) => (

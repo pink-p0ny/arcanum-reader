@@ -63,7 +63,44 @@ async function migrate(db: SQLite.SQLiteDatabase) {
     `);
     version = 1;
   }
+  if (version < 2) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS sessions_ended ON sessions(ended_at);
+    `);
+    version = 2;
+  }
   await db.execAsync(`PRAGMA user_version = ${version}`);
+}
+
+// ---- reading sessions ----
+export interface SessionRow {
+  book_id: number;
+  started_at: number;
+  ended_at: number;
+}
+
+export async function insertSession(row: SessionRow) {
+  const db = await getDb();
+  await db.runAsync(
+    'INSERT INTO sessions (book_id, started_at, ended_at) VALUES (?, ?, ?)',
+    row.book_id,
+    row.started_at,
+    row.ended_at,
+  );
+}
+
+export async function getSessionsSince(sinceMs: number): Promise<SessionRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<SessionRow>(
+    'SELECT book_id, started_at, ended_at FROM sessions WHERE ended_at >= ? ORDER BY started_at',
+    sinceMs,
+  );
 }
 
 // ---- kv ----
@@ -357,6 +394,6 @@ export async function resolveAnnotationSync(localId: number, result: Annotation 
 export async function clearLocalData() {
   const db = await getDb();
   await db.execAsync(
-    'DELETE FROM books; DELETE FROM downloads; DELETE FROM annotations; DELETE FROM progress; DELETE FROM kv;',
+    'DELETE FROM books; DELETE FROM downloads; DELETE FROM annotations; DELETE FROM progress; DELETE FROM kv; DELETE FROM sessions;',
   );
 }

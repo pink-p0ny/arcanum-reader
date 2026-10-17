@@ -22,6 +22,7 @@ import { getProvider } from '@/lib/provider';
 import { getBook, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
 import { authorsLine } from '@/lib/library';
+import { shareHighlights } from '@/lib/export';
 import { loadAnnotations } from '@/lib/sync';
 import type { AppBookDetail, AppBookSummary } from '@/lib/types';
 
@@ -243,10 +244,26 @@ export default function BookScreen() {
       </View>
 
       <View style={styles.block}>
-        <ThemedText style={styles.h2}>
-          Highlights & Notes
-          {annotations.data ? ` · ${annotations.data.length}` : ''}
-        </ThemedText>
+        <View style={styles.h2Row}>
+          <ThemedText style={styles.h2}>
+            Highlights & Notes
+            {annotations.data ? ` · ${annotations.data.length}` : ''}
+          </ThemedText>
+          {book && (annotations.data ?? []).length > 0 ? (
+            <Pressable
+              hitSlop={8}
+              onPress={() =>
+                shareHighlights(book, annotations.data ?? []).catch((e) =>
+                  Alert.alert('Could not share', (e as Error).message),
+                )
+              }
+            >
+              <ThemedText type="small" style={styles.accent}>
+                Share
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
         {annotations.isLoading ? (
           <ActivityIndicator />
         ) : (annotations.data ?? []).length === 0 ? (
@@ -370,6 +387,8 @@ const styles = StyleSheet.create({
   },
   block: { gap: Spacing.two },
   h2: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  h2Row: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  accent: { color: '#e8734a', fontWeight: '600' },
   body: { fontWeight: '400' },
   more: { color: '#e8734a', fontWeight: '600' },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.four },

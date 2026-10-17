@@ -1,5 +1,6 @@
 import { aiEnabled, aiPick, ensureAiLoaded } from './ai';
 import { getBooks, kvGet, kvSet } from './db';
+import { ensureHiddenGenresLoaded, hiddenGenresStore, pruneGenres } from './genres';
 import {
   luckyCandidates,
   pickLocal,
@@ -38,7 +39,13 @@ export async function drawLucky(
   exclude: number | null = null,
   opts: { mood?: string } = {},
 ): Promise<LuckyPick | null> {
-  const [books, skips] = await Promise.all([getBooks({ sort: 'title' }), loadSkips(), ensureAiLoaded()]);
+  const [all, skips] = await Promise.all([
+    getBooks({ sort: 'title' }),
+    loadSkips(),
+    ensureAiLoaded(),
+    ensureHiddenGenresLoaded(),
+  ]);
+  const books = pruneGenres(all, hiddenGenresStore.get());
   const scored = scoreCandidates(books, skips, exclude);
   if (scored.length === 0) return null;
   if (!aiEnabled()) return pickLocal(scored);

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AiSettingsSheet } from '@/components/ai-settings-sheet';
 import { BinderySettingsSheet } from '@/components/bindery-settings-sheet';
+import { HiddenGenresSheet } from '@/components/hidden-genres-sheet';
 import { LargeTitle } from '@/components/large-title';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -17,6 +18,7 @@ import { booksDir, deleteDownload, formatBytes } from '@/lib/downloads';
 import { useLibrarySync } from '@/lib/library';
 import { AI_MODELS, aiStore, ensureAiLoaded } from '@/lib/ai';
 import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
+import { hiddenGenresStore } from '@/lib/genres';
 import { clearSkips } from '@/lib/lucky';
 import { localOnlyStore, logout, sessionStore, setLocalOnly } from '@/lib/session';
 import { folderSupportsICloud, libraryFolder } from '@/lib/library-folder';
@@ -92,6 +94,8 @@ export default function SettingsScreen() {
   const [showAi, setShowAi] = useState(false);
   const bindery = useStore(binderyStore);
   const [showBindery, setShowBindery] = useState(false);
+  const hiddenGenres = useStore(hiddenGenresStore);
+  const [showGenres, setShowGenres] = useState(false);
   useEffect(() => {
     ensureAiLoaded();
     ensureBinderyLoaded();
@@ -171,12 +175,24 @@ export default function SettingsScreen() {
         </ThemedText>
       </Section>
 
-      <Section title="Reading">
-        <Row label="Reset Reader Settings" onPress={() => updateSettings(DEFAULT_READER_SETTINGS)} />
+      <Section title="Home">
+        <Row
+          label="Browse Genres"
+          value={hiddenGenres.length ? `${hiddenGenres.length} hidden` : 'All shown'}
+          onPress={() => setShowGenres(true)}
+        />
         <Row
           label="Forget Surprise Me Skips"
           onPress={() => clearSkips().then(() => Alert.alert('Done', 'Every book is back in the draw.'))}
         />
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Hidden genres stay on the books but leave Browse by Genre, the shelves and Surprise Me.
+        </ThemedText>
+      </Section>
+      <HiddenGenresSheet visible={showGenres} onClose={() => setShowGenres(false)} />
+
+      <Section title="Reading">
+        <Row label="Reset Reader Settings" onPress={() => updateSettings(DEFAULT_READER_SETTINGS)} />
         <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
           Fonts, margins and themes are adjusted inside the reader with the Aa button.
         </ThemedText>

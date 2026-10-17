@@ -8,6 +8,7 @@ import { AppState, Linking, useColorScheme } from 'react-native';
 import { importEpubs } from '@/lib/library-folder';
 import { syncLibrary } from '@/lib/library';
 import { loadLocalOnly, loadSession, localOnlyStore, sessionStore } from '@/lib/session';
+import { ensureHiddenGenresLoaded } from '@/lib/genres';
 import { loadSettings } from '@/lib/settings';
 import { flushPending } from '@/lib/sync';
 
@@ -24,7 +25,7 @@ export default function RootLayout() {
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadSession(), loadSettings(), loadLocalOnly()])
+    Promise.all([loadSession(), loadSettings(), loadLocalOnly(), ensureHiddenGenresLoaded()])
       .catch(() => {})
       .finally(() => setBooted(true));
   }, []);

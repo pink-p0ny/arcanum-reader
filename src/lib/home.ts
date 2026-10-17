@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { bestRating, genreAffinity, inProgress, isFinished } from './taste';
 import { getBooks } from './db';
 import { collapseEditions } from './editions';
+import { hiddenGenresStore, pruneGenres } from './genres';
+import { useStore } from './store';
 import type { AppBookSummary } from './types';
 
 export { bestRating, genreAffinity, inProgress, isFinished } from './taste';
@@ -98,9 +100,10 @@ export function buildHome(books: AppBookSummary[]): HomeData {
 }
 
 export function useHome() {
+  const hidden = useStore(hiddenGenresStore);
   return useQuery({
-    queryKey: ['home'],
-    queryFn: async () => buildHome(collapseEditions(await getBooks({ sort: 'title' }))),
+    queryKey: ['home', hidden],
+    queryFn: async () => buildHome(pruneGenres(collapseEditions(await getBooks({ sort: 'title' })), hidden)),
     placeholderData: (prev) => prev,
   });
 }

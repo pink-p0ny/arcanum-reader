@@ -23,6 +23,7 @@ import { getBook, getBooks, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
 import { siblingEditions } from '@/lib/editions';
 import { pickReadableFile } from '@/lib/formats';
+import { isFolderBook } from '@/lib/library-folder';
 import { authorsLine } from '@/lib/library';
 import { shareHighlights } from '@/lib/export';
 import { loadAnnotations } from '@/lib/sync';
@@ -101,7 +102,9 @@ export default function BookScreen() {
     name: book.primaryFileName,
   });
   const isEpub = !!readable;
-  const downloaded = !!download.data;
+  // Folder books are already on the device (or in iCloud Drive); there is nothing to download or remove.
+  const local = isFolderBook(bookId);
+  const downloaded = local || !!download.data;
   const progress = book.readProgress ?? 0;
 
   const startDownload = async () => {
@@ -168,7 +171,7 @@ export default function BookScreen() {
                     : primaryLabel}
                 </ThemedText>
               </Pressable>
-              {downloaded ? (
+              {local ? null : downloaded ? (
                 <Pressable
                   onPress={() =>
                     Alert.alert('Remove download?', 'You can download it again any time.', [

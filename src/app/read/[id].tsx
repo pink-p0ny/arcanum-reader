@@ -20,7 +20,7 @@ import { TocSheet } from '@/components/reader/toc-sheet';
 import { TtsBar } from '@/components/reader/tts-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { api } from '@/lib/api';
+import { getProvider } from '@/lib/provider';
 import { getBook, type LocalAnnotation } from '@/lib/db';
 import { downloadBook, downloadsStore, localBookFile } from '@/lib/downloads';
 import { readerPageUri } from '@/lib/reader-asset';
@@ -113,7 +113,7 @@ export default function ReadScreen() {
         const summary = await getBook(bookId);
         let detail: AppBookDetail | null = null;
         try {
-          detail = await api.books.detail(bookId);
+          detail = await getProvider().bookDetail(bookId);
         } catch {}
         const epub =
           detail?.files?.find((f) => f.isBook && f.bookType === 'EPUB') ??

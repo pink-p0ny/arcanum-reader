@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
-import { api, isOfflineError } from './api';
+import { isOfflineError } from './api';
+import { getProvider } from './provider';
 import { deleteBooksNotIn, getBooks, kvGet, kvSet, upsertBooks, type LibrarySort } from './db';
 import type { AppBookSummary } from './types';
 
@@ -12,14 +13,9 @@ export async function syncLibrary(): Promise<{ count: number }> {
   const ids: number[] = [];
   let page = 0;
   for (;;) {
-    const res = await api.books.list({
-      page,
-      size: PAGE,
-      sort: 'title',
-      dir: 'asc',
-    });
-    await upsertBooks(res.content);
-    ids.push(...res.content.map((b) => b.id));
+    const res = await getProvider().listBooks(page, PAGE);
+    await upsertBooks(res.items);
+    ids.push(...res.items.map((b) => b.id));
     if (!res.hasNext) break;
     page += 1;
   }

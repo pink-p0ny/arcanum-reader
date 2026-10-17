@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
-import { coverSource } from '@/lib/api';
+import { getProvider } from '@/lib/provider';
 import { sessionStore } from '@/lib/session';
 import type { AppBookSummary } from '@/lib/types';
 
@@ -18,16 +18,18 @@ export const COVER_RATIO = 3 / 2;
 
 export function BookCover({ book, width, showProgress }: Props) {
   const theme = useTheme();
+  // Subscribing keeps covers fresh when the token rotates; the provider reads the credentials itself.
   const session = useStore(sessionStore, (s) => s.session);
+  const source = session ? getProvider().coverSource(book) : null;
   const height = Math.round(width * COVER_RATIO);
   const progress = book.readProgress ?? 0;
 
   return (
     <View style={{ width }}>
       <View style={[styles.frame, { width, height, backgroundColor: theme.backgroundElement }]}>
-        {session ? (
+        {source ? (
           <Image
-            source={coverSource(session.serverUrl, session.accessToken, book.id, book.coverUpdatedOn)}
+            source={source}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={150}

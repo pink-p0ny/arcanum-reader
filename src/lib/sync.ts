@@ -1,4 +1,5 @@
-import { api, isOfflineError } from './api';
+import { isOfflineError } from './api';
+import { getProvider } from './provider';
 import {
   deleteLocalAnnotation,
   getAllPendingAnnotations,
@@ -14,7 +15,7 @@ import {
   updateLocalAnnotation,
   type LocalAnnotation,
 } from './db';
-import type { Annotation, AnnotationStyle, AppBookDetail, UpdateProgressRequest } from './types';
+import type { Annotation, AnnotationStyle, AppBookDetail } from './types';
 
 // ---------- progress ----------
 
@@ -25,25 +26,13 @@ export interface Position {
 }
 
 async function pushProgress(bookId: number, fileId: number | null, pos: Position, updatedAt: number) {
-  const percentage = Math.round(pos.fraction * 100 * 100) / 100;
-  const body: UpdateProgressRequest = {
-    epubProgress: {
-      cfi: pos.cfi ?? undefined,
-      href: pos.href ?? undefined,
-      percentage,
-    },
-  };
-  if (fileId != null) {
-    body.fileProgress = {
-      bookFileId: fileId,
-      positionData: pos.cfi ?? undefined,
-      positionHref: pos.href ?? undefined,
-      progressPercent: percentage,
-    };
-  }
-  await api.books.updateProgress(bookId, body);
+  const provider = getProvider();
+  if (provider.capabilities.progress) await provider.updateProgress(bookId, fileId, pos);
   await markProgressSynced(bookId, updatedAt);
 }
+
+/** The active provider's annotation API, or null for backends that keep highlights on the device only. */
+const remoteAnnotations = () => getProvider().annotations ?? null;
 
 /** Save locally right away, then try to push. Failures stay queued for `flushPending`. */
 export async function saveProgress(bookId: number, fileId: number | null, pos: Position) {
@@ -91,11 +80,14 @@ export async function resolveStartPosition(
 // ---------- annotations ----------
 
 export async function loadAnnotations(bookId: number): Promise<LocalAnnotation[]> {
-  try {
-    const server = await api.annotations.forBook(bookId);
-    await replaceServerAnnotations(bookId, server);
-  } catch (e) {
-    if (!isOfflineError(e)) console.warn('annotation fetch failed', e);
+  const remote = remoteAnnotations();
+  if (remote) {
+    try {
+      const server = await remote.list(bookId);
+      await replaceServerAnnotations(bookId, server);
+    } catch (e) {
+      if (!isOfflineError(e)) console.warn('annotation fetch failed', e);
+    }
   }
   return getAnnotations(bookId);
 }
@@ -113,8 +105,10 @@ export async function createAnnotation(input: {
     ...input,
     text: input.text.slice(0, 5000),
   });
+  const remote = remoteAnnotations();
+  if (!remote) return local;
   try {
-    const created = await api.annotations.create({
+    const created = await remote.create({
       bookId: input.bookId,
       cfi: input.cfi,
       text: local.text,
@@ -136,9 +130,10 @@ export async function updateAnnotation(
   patch: { color?: string; style?: AnnotationStyle; note?: string },
 ) {
   await updateLocalAnnotation(a.localId, patch, 'update');
-  if (a.id > 0) {
+  const remote = remoteAnnotations();
+  if (remote && a.id > 0) {
     try {
-      const updated = await api.annotations.update(a.id, patch);
+      const updated = await remote.update(a.id, patch);
       await resolveAnnotationSync(a.localId, updated);
     } catch (e) {
       if (!isOfflineError(e)) console.warn('annotation update failed', e);
@@ -148,9 +143,10 @@ export async function updateAnnotation(
 
 export async function deleteAnnotation(a: LocalAnnotation) {
   await deleteLocalAnnotation(a.localId);
-  if (a.id > 0) {
+  const remote = remoteAnnotations();
+  if (remote && a.id > 0) {
     try {
-      await api.annotations.remove(a.id);
+      await remote.remove(a.id);
       await resolveAnnotationSync(a.localId, null);
     } catch (e) {
       if (!isOfflineError(e)) console.warn('annotation delete failed', e);
@@ -179,11 +175,13 @@ export async function flushPending() {
         if (isOfflineError(e)) return;
       }
     }
+    const remote = remoteAnnotations();
+    if (!remote) return;
     for (const row of await getAllPendingAnnotations()) {
       const a = JSON.parse(row.json) as Annotation;
       try {
         if (row.pending === 'create') {
-          const created = await api.annotations.create({
+          const created = await remote.create({
             bookId: row.book_id,
             cfi: a.cfi,
             text: a.text,
@@ -194,7 +192,7 @@ export async function flushPending() {
           });
           await resolveAnnotationSync(row.local_id, created);
         } else if (row.pending === 'update' && row.server_id) {
-          const updated = await api.annotations.update(row.server_id, {
+          const updated = await remote.update(row.server_id, {
             color: a.color,
             style: a.style,
             note: a.note,
@@ -202,7 +200,7 @@ export async function flushPending() {
           await resolveAnnotationSync(row.local_id, updated);
         } else if (row.pending === 'delete' && row.server_id) {
           try {
-            await api.annotations.remove(row.server_id);
+            await remote.remove(row.server_id);
           } catch (e) {
             if (isOfflineError(e)) throw e; // anything else (e.g. already gone) counts as done
           }

@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { getDownload, removeDownload, setDownload } from './db';
-import { getFreshSession } from './session';
+import { getProvider } from './provider';
 import { createStore } from './store';
 
 export const booksDir = () => new Directory(Paths.document, 'books');
@@ -32,29 +32,24 @@ export async function localBookFile(bookId: number): Promise<File | null> {
 }
 
 export async function downloadBook(bookId: number, fileId: number | null | undefined, bookType = 'EPUB') {
-  const session = await getFreshSession();
-  if (!session) throw new Error('Not signed in');
+  const source = await getProvider().downloadSource(bookId, bookType);
   const dir = booksDir();
   if (!dir.exists) dir.create({ intermediates: true });
   const dest = new File(dir, `${bookId}.epub`);
   if (dest.exists) dest.delete();
   setState(bookId, { status: 'downloading', progress: 0 });
   try {
-    const task = File.createDownloadTask(
-      `${session.serverUrl}/api/v1/books/${bookId}/content?bookType=${encodeURIComponent(bookType)}`,
-      dest,
-      {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-        sessionType: 'foreground',
-        onProgress: ({ bytesWritten, totalBytes }) => {
-          if (totalBytes > 0)
-            setState(bookId, {
-              status: 'downloading',
-              progress: bytesWritten / totalBytes,
-            });
-        },
+    const task = File.createDownloadTask(source.url, dest, {
+      headers: source.headers ?? {},
+      sessionType: 'foreground',
+      onProgress: ({ bytesWritten, totalBytes }) => {
+        if (totalBytes > 0)
+          setState(bookId, {
+            status: 'downloading',
+            progress: bytesWritten / totalBytes,
+          });
       },
-    );
+    });
     const file = await task.downloadAsync();
     if (!file) throw new Error('Download did not complete');
     await setDownload({

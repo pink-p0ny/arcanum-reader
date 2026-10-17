@@ -17,7 +17,8 @@ import { BookCover } from '@/components/book-cover';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api, isOfflineError } from '@/lib/api';
+import { isOfflineError } from '@/lib/api';
+import { getProvider } from '@/lib/provider';
 import { getBook, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
 import { authorsLine } from '@/lib/library';
@@ -62,7 +63,7 @@ export default function BookScreen() {
   });
   const detail = useQuery({
     queryKey: ['bookDetail', bookId],
-    queryFn: () => api.books.detail(bookId),
+    queryFn: () => getProvider().bookDetail(bookId),
     retry: false,
   });
   const download = useQuery({

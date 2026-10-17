@@ -9,7 +9,11 @@
           "image-name": "arcanum-book.svg",
           "name": "arcanum-book",
           "position": {
-            "scale": 0.82
+            "scale": 0.82,
+            "translation-in-points": [
+              0,
+              0
+            ]
           }
         }
       ],

@@ -17,3 +17,7 @@
   the in-app `SelectionBar`. Native changes need a development build: `npx eas-cli build --profile development`.
   Never pass `menuItems` to the WebView: react-native-webview then hides every system action.
   Likewise never set `allowsLinkPreview={false}` on it: WebKit then stops showing the selection edit menu.
+- `assets/expo.icon` (Icon Composer bundle) is NOT referenced from app.json: EAS build b1565afd crashed in
+  actool on it ("attempt to insert nil object"). The 1024px `assets/images/icon.png` is the shipped icon.
+  To retry the layered icon, open the bundle in Icon Composer on a Mac with Xcode 26, save, then set
+  `ios.icon` back to `./assets/expo.icon`.

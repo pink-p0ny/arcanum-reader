@@ -204,6 +204,35 @@ const commands = {
     }
   },
 
+  /** Gives a subscription an equalized price in every territory that lacks one, from its USA price. */
+  async equalize(subId) {
+    const prices = await all(
+      `/v1/subscriptions/${subId}/prices?include=territory,subscriptionPricePoint&limit=200`,
+    );
+    const priced = new Set(prices.map((p) => p.relationships?.territory?.data?.id).filter(Boolean));
+    const usa = prices.find((p) => p.relationships?.territory?.data?.id === 'USA');
+    if (!usa) throw new Error('No USA price to equalize from');
+    const pointId = usa.relationships.subscriptionPricePoint.data.id;
+    const eq = await all(`/v1/subscriptionPricePoints/${pointId}/equalizations?include=territory&limit=200`);
+    let added = 0;
+    for (const point of eq) {
+      const territory = point.relationships?.territory?.data?.id;
+      if (!territory || priced.has(territory)) continue;
+      await api('POST', '/v1/subscriptionPrices', {
+        data: {
+          type: 'subscriptionPrices',
+          relationships: {
+            subscription: rel('subscriptions', subId),
+            subscriptionPricePoint: rel('subscriptionPricePoints', point.id),
+            territory: rel('territories', territory),
+          },
+        },
+      });
+      added += 1;
+    }
+    console.log(`had ${priced.size} priced territories, added ${added}`);
+  },
+
   async territories() {
     const t = await all('/v1/territories?limit=200');
     console.log(t.length, 'territories');

@@ -447,12 +447,15 @@ const commands = {
   },
 };
 
-const [cmd, ...args] = process.argv.slice(2);
-if (!commands[cmd]) {
-  console.error(`commands: ${Object.keys(commands).join(', ')}`);
-  process.exit(1);
+const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) {
+  const [cmd, ...args] = process.argv.slice(2);
+  if (!commands[cmd]) {
+    console.error(`commands: ${Object.keys(commands).join(', ')}`);
+    process.exit(1);
+  }
+  commands[cmd](...args).catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });
 }
-commands[cmd](...args).catch((e) => {
-  console.error(e.message);
-  process.exit(1);
-});

@@ -447,6 +447,144 @@ const commands = {
   },
 };
 
+
+/**
+ * Pushes the store listing from docs/app-store.md: subtitle, categories, privacy URL, promotional text,
+ * description, keywords, support and marketing URLs, and the age rating (all "none"). Screenshots and the
+ * build are attached separately. Run again after editing the doc; it overwrites what is there.
+ */
+const LISTING_DOC = new URL('../docs/app-store.md', import.meta.url);
+
+export function parseListing(md) {
+  const section = (title) => {
+    const m = md.match(new RegExp(`^## ${title}[^\\n]*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm'));
+    return (m?.[1] ?? '').trim();
+  };
+  const cell = (field) => md.match(new RegExp(`^\\| ${field} \\| ([^|]+) \\|`, 'm'))?.[1].trim() ?? '';
+  const paragraphs = (text) =>
+    text
+      .split(/\n{2,}/)
+      // Keep the line break after an all-caps heading; join every other wrapped line.
+      .map((p) =>
+        p
+          .replace(/^([A-Z0-9 ?'&]+)\n/m, '$1\u0000')
+          .replace(/\n(?=[^•\n])/g, ' ')
+          .replace(/ {2,}/g, ' ')
+          .replace(/\u0000/g, '\n'),
+      )
+      .join('\n\n');
+  return {
+    name: cell('Name'),
+    subtitle: cell('Subtitle'),
+    primaryCategory: cell('Primary category'),
+    secondaryCategory: cell('Secondary category'),
+    promotionalText: section('Promotional text').replace(/\n/g, ' '),
+    description: paragraphs(section('Description')),
+    keywords: section('Keywords').replace(/\n/g, ''),
+    supportUrl: cell('Support URL'),
+    marketingUrl: cell('Marketing URL'),
+    privacyPolicyUrl: cell('Privacy policy URL'),
+  };
+}
+
+const CATEGORY_IDS = { Books: 'BOOKS', Productivity: 'PRODUCTIVITY', Education: 'EDUCATION', Utilities: 'UTILITIES' };
+
+commands.listing = async function listing(versionString = '1.0') {
+  const L = parseListing(readFileSync(LISTING_DOC, 'utf8'));
+  const limits = { name: 30, subtitle: 30, promotionalText: 170, description: 4000, keywords: 100 };
+  for (const [k, max] of Object.entries(limits))
+    if (L[k].length > max) throw new Error(`${k} is ${L[k].length} chars, limit ${max}`);
+  const app = await appId();
+
+  const info = (await all(`/v1/apps/${app}/appInfos`)).find((i) =>
+    ['PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED'].includes(i.attributes.state ?? i.attributes.appStoreState),
+  );
+  if (!info) throw new Error('no editable appInfo');
+  await api('PATCH', `/v1/appInfos/${info.id}`, {
+    data: {
+      type: 'appInfos',
+      id: info.id,
+      relationships: {
+        primaryCategory: rel('appCategories', CATEGORY_IDS[L.primaryCategory] ?? L.primaryCategory),
+        secondaryCategory: rel('appCategories', CATEGORY_IDS[L.secondaryCategory] ?? L.secondaryCategory),
+      },
+    },
+  });
+  console.log('categories', L.primaryCategory, '/', L.secondaryCategory);
+
+  const infoLoc = (await all(`/v1/appInfos/${info.id}/appInfoLocalizations`)).find((l) => l.attributes.locale === 'en-US');
+  const infoAttrs = { name: L.name, subtitle: L.subtitle, privacyPolicyUrl: L.privacyPolicyUrl };
+  if (infoLoc)
+    await api('PATCH', `/v1/appInfoLocalizations/${infoLoc.id}`, {
+      data: { type: 'appInfoLocalizations', id: infoLoc.id, attributes: infoAttrs },
+    });
+  else
+    await api('POST', '/v1/appInfoLocalizations', {
+      data: { type: 'appInfoLocalizations', attributes: { locale: 'en-US', ...infoAttrs }, relationships: { appInfo: rel('appInfos', info.id) } },
+    });
+  console.log('name/subtitle/privacy url set');
+
+  const age = await api('GET', `/v1/appInfos/${info.id}/ageRatingDeclaration`);
+  await api('PATCH', `/v1/ageRatingDeclarations/${age.data.id}`, {
+    data: {
+      type: 'ageRatingDeclarations',
+      id: age.data.id,
+      attributes: {
+        // Content descriptors
+        alcoholTobaccoOrDrugUseOrReferences: 'NONE',
+        contests: 'NONE',
+        gamblingSimulated: 'NONE',
+        gunsOrOtherWeapons: 'NONE',
+        horrorOrFearThemes: 'NONE',
+        matureOrSuggestiveThemes: 'NONE',
+        medicalOrTreatmentInformation: 'NONE',
+        profanityOrCrudeHumor: 'NONE',
+        sexualContentGraphicAndNudity: 'NONE',
+        sexualContentOrNudity: 'NONE',
+        violenceCartoonOrFantasy: 'NONE',
+        violenceRealistic: 'NONE',
+        violenceRealisticProlongedGraphicOrSadistic: 'NONE',
+        // Features
+        advertising: false,
+        gambling: false,
+        healthOrWellnessTopics: false,
+        lootBox: false,
+        messagingAndChat: false,
+        parentalControls: false,
+        ageAssurance: false,
+        socialMedia: false,
+        socialMediaAgeRestricted: false,
+        unrestrictedWebAccess: false,
+        userGeneratedContent: false,
+      },
+    },
+  }).then(() => console.log('age rating: all none'), (e) => console.log('age rating skipped:', e.message.split('\n')[1]));
+
+  const version = (await all(`/v1/apps/${app}/appStoreVersions?filter[platform]=IOS`)).find(
+    (v) => v.attributes.versionString === versionString,
+  );
+  if (!version) throw new Error(`no App Store version ${versionString}`);
+  const verLoc = (await all(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).find(
+    (l) => l.attributes.locale === 'en-US',
+  );
+  const verAttrs = {
+    description: L.description,
+    keywords: L.keywords,
+    promotionalText: L.promotionalText,
+    supportUrl: L.supportUrl,
+    marketingUrl: L.marketingUrl,
+  };
+  if (verLoc)
+    await api('PATCH', `/v1/appStoreVersionLocalizations/${verLoc.id}`, {
+      data: { type: 'appStoreVersionLocalizations', id: verLoc.id, attributes: verAttrs },
+    });
+  else
+    await api('POST', '/v1/appStoreVersionLocalizations', {
+      data: { type: 'appStoreVersionLocalizations', attributes: { locale: 'en-US', ...verAttrs }, relationships: { appStoreVersion: rel('appStoreVersions', version.id) } },
+    });
+  console.log(`version ${versionString}: description (${L.description.length}), keywords (${L.keywords.length}), urls set`);
+};
+
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
   const [cmd, ...args] = process.argv.slice(2);

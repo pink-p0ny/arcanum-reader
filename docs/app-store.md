@@ -14,20 +14,23 @@ Paste-ready text for App Store Connect. Keep this file in sync with what is live
 
 ## Promotional text (170)
 
-Read the ebooks on your own Grimmory or Booklore server, with highlights and notes that sync back,
-read-aloud, and a home page that learns what you like.
+Read ebooks from your own Grimmory or Booklore server, or a folder in iCloud Drive. Highlights and
+notes sync back, it reads aloud, and Home learns your taste.
 
 ## Description (4000)
 
 Arcanum Reader is an ebook reader for people who keep their own library. Point it at your Grimmory or
 Booklore server and every book is there, with your reading position, highlights and notes syncing both
-ways. Nothing passes through anyone else's cloud.
+ways. No server? Drop EPUBs into a folder in iCloud Drive and read them on every iPad you own. Nothing
+passes through anyone else's cloud.
 
 READING
+• EPUB, Kindle AZW3 and MOBI, and FB2
 • Paged or scrolling, one or two columns, with real control over margins, line spacing, fonts and width
 • Light, sepia and dark themes, or follow the system
 • Highlights in six colours and four styles, with notes, all synced to your server
 • Look Up, Translate and Share from the system menu, right next to Highlight
+• Search inside the book
 • Read aloud with the voices built into iPadOS, sentence by sentence
 • Downloads for offline reading; anything you do offline syncs when you are back
 
@@ -35,8 +38,11 @@ YOUR LIBRARY
 • A home page in the style you would expect: Continue Reading, shelves for the genres you actually finish
   and rate highly, top rated, recently added
 • Browse by genre, search by title or author, sort any way you like
+• The same book in two formats shows as one card; pick the edition when you open it
 • Community ratings from Goodreads, Amazon and Hardcover, as synced by your server
 • Surprise Me: one book, chosen for you, with a reason, and a button to try another
+• Reading time this week, your streak, and a seven-day chart
+• Share a book's highlights and notes as Markdown
 
 WANT MORE?
 • Ask a Bindery server for books you do not have yet, straight from the app
@@ -46,11 +52,12 @@ ARCANUM NEVER SEES YOUR BOOKS
 The app talks only to servers you choose. There is no account with us, no analytics, and no copy of your
 library anywhere but your devices and your server.
 
-Arcanum Reader needs a Grimmory or Booklore server to read from. It is free and open source.
+Arcanum Reader works with a Grimmory or Booklore server, or on its own with a folder of books. It is
+free and open source.
 
 ## Keywords (100)
 
-ebook,epub,reader,grimmory,booklore,self-hosted,library,highlights,notes,read aloud,calibre
+ebook,epub,mobi,reader,grimmory,booklore,self-hosted,library,highlights,notes,read aloud,calibre
 
 ## URLs
 
@@ -81,15 +88,18 @@ in the system browser after a confirmation). Result: 4+.
 
 ## Review notes
 
-Arcanum Reader is a client for a self-hosted library server (Grimmory, an open-source project). To review,
-sign in with:
+Arcanum Reader is a client for a self-hosted library server (Grimmory or Booklore, both open source). It
+also works with no server at all: on the sign-in screen tap "No server? Use a folder of books instead",
+then add EPUBs with Add Books on the Library tab or by opening an EPUB from Files. To review the server
+features, sign in with:
 
     Server:   https://grimmory.example.com
     Username: <create a reviewer account in Grimmory>
     Password: <...>
 
 The library contains public-domain books. All features work with this account. Bindery and AI picks are
-optional integrations that need the user's own servers or API key; leave them unconfigured.
+optional integrations that need the user's own servers or API key; leave them unconfigured. Arcanum Cloud
+(the subscription) is not offered in this release.
 
 ## Screenshots to take (iPad 13-inch and 11-inch)
 

@@ -585,6 +585,83 @@ commands.listing = async function listing(versionString = '1.0') {
   console.log(`version ${versionString}: description (${L.description.length}), keywords (${L.keywords.length}), urls set`);
 };
 
+
+/**
+ * Replaces the App Store screenshots of a version from a folder of PNGs. File names decide the device:
+ * `13-*.png` go to the 13-inch iPad set, `11-*.png` to the 11-inch one; the rest of the name orders them.
+ * Produced by scripts/screenshots.sh.
+ */
+const SHOT_TYPES = { 13: 'APP_IPAD_PRO_3GEN_129', 11: 'APP_IPAD_PRO_3GEN_11' };
+
+commands.storeshots = async function storeshots(dir, versionString = '1.0') {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const { join } = await import('node:path');
+  const app = await appId();
+  const version = (await all(`/v1/apps/${app}/appStoreVersions?filter[platform]=IOS`)).find(
+    (v) => v.attributes.versionString === versionString,
+  );
+  if (!version) throw new Error(`no App Store version ${versionString}`);
+  const loc = (await all(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).find(
+    (l) => l.attributes.locale === 'en-US',
+  );
+  if (!loc) throw new Error('no en-US localization; run listing first');
+  const sets = await all(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets`);
+
+  for (const [prefix, displayType] of Object.entries(SHOT_TYPES)) {
+    const files = readdirSync(dir)
+      .filter((f) => f.startsWith(`${prefix}-`) && f.endsWith('.png'))
+      .sort();
+    if (!files.length) continue;
+    let set = sets.find((s) => s.attributes.screenshotDisplayType === displayType);
+    if (!set) {
+      set = (
+        await api('POST', '/v1/appScreenshotSets', {
+          data: {
+            type: 'appScreenshotSets',
+            attributes: { screenshotDisplayType: displayType },
+            relationships: { appStoreVersionLocalization: rel('appStoreVersionLocalizations', loc.id) },
+          },
+        })
+      ).data;
+    }
+    for (const old of await all(`/v1/appScreenshotSets/${set.id}/appScreenshots`))
+      await api('DELETE', `/v1/appScreenshots/${old.id}`);
+
+    const ids = [];
+    for (const f of files) {
+      const bytes = readFileSync(join(dir, f));
+      const created = (
+        await api('POST', '/v1/appScreenshots', {
+          data: {
+            type: 'appScreenshots',
+            attributes: { fileName: f, fileSize: bytes.length },
+            relationships: { appScreenshotSet: rel('appScreenshotSets', set.id) },
+          },
+        })
+      ).data;
+      for (const op of created.attributes.uploadOperations ?? []) {
+        const headers = Object.fromEntries((op.requestHeaders ?? []).map((h) => [h.name, h.value]));
+        const r = await fetch(op.url, { method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length) });
+        if (!r.ok) throw new Error(`upload chunk failed: ${r.status}`);
+      }
+      await api('PATCH', `/v1/appScreenshots/${created.id}`, {
+        data: {
+          type: 'appScreenshots',
+          id: created.id,
+          attributes: { uploaded: true, sourceFileChecksum: createHash('md5').update(bytes).digest('hex') },
+        },
+      });
+      ids.push(created.id);
+      console.log(displayType, f, created.id);
+    }
+    await api('PATCH', `/v1/appScreenshotSets/${set.id}/relationships/appScreenshots`, {
+      data: ids.map((id) => ({ type: 'appScreenshots', id })),
+    });
+  }
+  console.log('done');
+};
+
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
   const [cmd, ...args] = process.argv.slice(2);

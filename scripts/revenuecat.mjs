@@ -141,6 +141,40 @@ const commands = {
     console.log('done');
   },
 
+  /**
+   * Uploads the App Store Connect team key and the In-App Purchase (subscription) key to the App Store app.
+   * Reads both .p8 files and the issuer id from ~/.appstoreconnect/private_keys. Field names were found by
+   * probing: the IAP key content goes in `subscription_private_key`, the team key in `app_store_connect_api_key`.
+   */
+  async credentials() {
+    const { homedir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = join(homedir(), '.appstoreconnect', 'private_keys');
+    const ascKeyId = process.env.ASC_KEY_ID ?? '34NTB4V9VM';
+    const iapKeyId = process.env.IAP_KEY_ID ?? 'KAYP8WK639';
+    const issuer = readFileSync(join(dir, `issuer_${ascKeyId}.txt`), 'utf8').trim();
+    const app = (await items('/apps')).find(
+      (a) => a.type === 'app_store' && a.app_store?.bundle_id === BUNDLE_ID,
+    );
+    if (!app) throw new Error('App Store app not found; run setup first');
+    const updated = await rc('POST', `/apps/${app.id}`, {
+      app_store: {
+        app_store_connect_api_key: readFileSync(join(dir, `AuthKey_${ascKeyId}.p8`), 'utf8'),
+        app_store_connect_api_key_id: ascKeyId,
+        app_store_connect_api_key_issuer: issuer,
+        subscription_private_key: readFileSync(join(dir, `SubscriptionKey_${iapKeyId}.p8`), 'utf8'),
+        subscription_key_id: iapKeyId,
+        subscription_key_issuer: issuer,
+      },
+    });
+    console.log(
+      'asc key configured:',
+      updated.app_store.app_store_connect_api_key_configured,
+      '| iap key configured:',
+      updated.app_store.subscription_key_configured,
+    );
+  },
+
   async app() {
     const app = (await items('/apps')).find((a) => a.type === 'app_store');
     console.log(JSON.stringify(app, null, 2));

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="760" viewBox="0 0 620 760">
+    
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="75%">
+      <stop offset="0" stop-color="#2b2256"/>
+      <stop offset="1" stop-color="#130f26"/>
+    </radialGradient>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2b57f"/>
+      <stop offset="0.5" stop-color="#d2703f"/>
+      <stop offset="1" stop-color="#a34a28"/>
+    </linearGradient>
+    <radialGradient id="inner" cx="50%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#a98bff" stop-opacity="0.9"/>
+      <stop offset="0.6" stop-color="#a98bff" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#a98bff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <mask id="keyhole-cut" maskUnits="userSpaceOnUse" x="-100" y="-100" width="700" height="900">
+      <rect x="-100" y="-100" width="700" height="900" fill="#fff"/>
+      <circle cx="287" cy="276" r="74" fill="#000"/>
+      <path d="M252,324 H322 L349,460 Q349,470 339,470 H235 Q225,470 225,460 Z" fill="#000"/>
+    </mask>
+  </defs>
+    <g transform="translate(60 44)">
+    <g id="book" >
+      <ellipse cx="250" cy="690" rx="230" ry="26" fill="#000" opacity="0.45" filter="url(#blur)"/>
+      <path d="M30,0 H74 V672 H30 a30,30 0 0 1 -30,-30 V30 a30,30 0 0 1 30,-30 Z" fill="#7d3419"/>
+      <path d="M74,0 H470 a30,30 0 0 1 30,30 V642 a30,30 0 0 1 -30,30 H74 Z" fill="url(#cover)"/>
+      
+      <path d="M0,86 H74 M0,586 H74" stroke="#f8dcae" stroke-opacity="0.55" stroke-width="6"/>
+      <rect x="114" y="40" width="346" height="592" rx="14" fill="none" stroke="#f8dcae" stroke-opacity="0.75" stroke-width="6"/>
+      <circle cx="287" cy="300" r="120" fill="#a98bff" opacity="0.35" filter="url(#blur)"/>
+      <g>
+        <circle cx="287" cy="276" r="74" fill="#130f26"/>
+        <path d="M252,324 H322 L349,460 Q349,470 339,470 H235 Q225,470 225,460 Z" fill="#130f26"/>
+        <circle cx="287" cy="276" r="74" fill="url(#inner)"/>
+        <path d="M252,324 H322 L349,460 Q349,470 339,470 H235 Q225,470 225,460 Z" fill="url(#inner)"/>
+      </g>
+    </g></g>
+  </svg>

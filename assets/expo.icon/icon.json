@@ -1,0 +1,32 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.07451,0.05882,0.14902,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "arcanum-book.svg",
+          "name": "arcanum-book",
+          "position": {
+            "scale": 0.82
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

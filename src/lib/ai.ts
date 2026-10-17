@@ -1,13 +1,14 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { kvGet, kvSet } from './db';
+import { isPremium } from './premium';
 import { createStore } from './store';
 
 /**
  * AI services. Today: bring-your-own Anthropic key, called straight from the device. The hosted and
  * self-hosted Arcanum Server modes slot in beside it with the same request shape and a different base URL.
  */
-export type AiMode = 'off' | 'byok';
+export type AiMode = 'off' | 'byok' | 'cloud';
 
 export interface AiConfig {
   mode: AiMode;
@@ -65,6 +66,7 @@ export async function setAiKey(key: string | null) {
 
 export function aiEnabled() {
   const s = aiStore.get();
+  if (s.mode === 'cloud') return isPremium();
   return s.mode === 'byok' && s.hasKey;
 }
 
@@ -117,6 +119,10 @@ async function anthropic(body: Record<string, unknown>, key: string) {
 /** Ask the model for one pick. Throws with a readable message when the key or network fails. */
 export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
   await ensureAiLoaded();
+  if (aiStore.get().mode === 'cloud') {
+    // The hosted service is not live yet; the subscription exists so it can be tested in sandbox.
+    throw new AiError('Arcanum Cloud is not available yet.');
+  }
   const key = await SecureStore.getItemAsync(SECRET_KEY);
   if (!key) throw new AiError('No API key saved.');
   const lines = req.candidates.map(

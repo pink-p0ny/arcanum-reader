@@ -89,7 +89,8 @@
       "router": {},
       "eas": {
         "projectId": "54ce969a-5046-4a16-840b-b0286529938a"
-      }
+      },
+      "revenueCatIosKey": ""
     },
     "runtimeVersion": {
       "policy": "appVersion"

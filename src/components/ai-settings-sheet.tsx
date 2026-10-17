@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { PremiumSheet } from '@/components/premium-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { AI_MODELS, aiStore, ensureAiLoaded, setAiKey, testAiKey, updateAiConfig } from '@/lib/ai';
+import {
+  AI_MODELS,
+  aiStore,
+  ensureAiLoaded,
+  setAiKey,
+  testAiKey,
+  updateAiConfig,
+  type AiMode,
+} from '@/lib/ai';
+import { CLOUD_ENABLED, ensurePremiumLoaded, premiumStore } from '@/lib/premium';
 import { useStore } from '@/lib/store';
 
 interface Props {
@@ -12,7 +22,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** Bring-your-own-key setup for AI picks. The hosted and self-hosted modes join this sheet later. */
+/** How AI features run: off, Arcanum Cloud (subscription), or the reader's own Anthropic key. */
 export function AiSettingsSheet({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -21,21 +31,50 @@ export function AiSettingsSheet({ visible, onClose }: Props) {
   );
 }
 
+function Label({ children }: { children: string }) {
+  return (
+    <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
+      {children}
+    </ThemedText>
+  );
+}
+
 function Body({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
   const ai = useStore(aiStore);
+  const premium = useStore(premiumStore);
   const [key, setKey] = useState('');
+  const [showPaywall, setShowPaywall] = useState(false);
   const [status, setStatus] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string }>({
     kind: 'idle',
   });
 
   useEffect(() => {
     ensureAiLoaded();
+    if (CLOUD_ENABLED) ensurePremiumLoaded();
   }, []);
 
-  const enabled = ai.mode === 'byok';
+  const modes: { id: AiMode; label: string; hint: string }[] = [
+    { id: 'off', label: 'Off', hint: 'Surprise Me uses the on-device scorer' },
+    ...(CLOUD_ENABLED
+      ? [
+          {
+            id: 'cloud' as AiMode,
+            label: 'Arcanum Cloud',
+            hint: premium.active ? 'Subscribed' : 'Subscription',
+          },
+        ]
+      : []),
+    { id: 'byok', label: 'Own API key', hint: 'Free, billed to your Anthropic account' },
+  ];
 
-  const toggle = (on: boolean) => updateAiConfig({ mode: on ? 'byok' : 'off' });
+  const choose = (mode: AiMode) => {
+    if (mode === 'cloud' && !premium.active) {
+      setShowPaywall(true);
+      return;
+    }
+    updateAiConfig({ mode });
+  };
 
   const save = async () => {
     if (!key.trim()) return;
@@ -64,23 +103,55 @@ function Body({ onClose }: { onClose: () => void }) {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-          <View style={styles.row}>
-            <ThemedText>Use my own Anthropic key</ThemedText>
-            <Switch value={enabled} onValueChange={toggle} />
-          </View>
-        </View>
         <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
           Surprise Me asks Claude to choose, and you can tell it what you are in the mood for. Only a short
           list of candidate titles and a summary of your taste are sent. Your library, server and sign-in
           never leave the device.
         </ThemedText>
 
-        {enabled ? (
+        <Label>RUNS ON</Label>
+        <View style={styles.pills}>
+          {modes.map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => choose(m.id)}
+              style={[
+                styles.pill,
+                { backgroundColor: theme.backgroundElement },
+                ai.mode === m.id && styles.pillActive,
+              ]}
+            >
+              <ThemedText style={{ color: ai.mode === m.id ? '#fff' : theme.text, fontWeight: '600' }}>
+                {m.label}
+              </ThemedText>
+              <ThemedText
+                type="small"
+                style={{ color: ai.mode === m.id ? '#ffffffcc' : theme.textSecondary }}
+              >
+                {m.hint}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
+        {ai.mode === 'cloud' ? (
           <>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-              MODEL
+            <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+              {premium.active
+                ? 'Arcanum Cloud is active on this Apple ID. The service itself is still being built; until it is live, Surprise Me falls back to the on-device scorer.'
+                : 'Arcanum Cloud needs a subscription.'}
             </ThemedText>
+            <Pressable onPress={() => setShowPaywall(true)} hitSlop={8} style={styles.inlineLink}>
+              <ThemedText style={styles.link}>
+                {premium.active ? 'Manage subscription' : 'Subscribe'}
+              </ThemedText>
+            </Pressable>
+          </>
+        ) : null}
+
+        {ai.mode === 'byok' ? (
+          <>
+            <Label>MODEL</Label>
             <View style={styles.pills}>
               {AI_MODELS.map((m) => (
                 <Pressable
@@ -105,9 +176,7 @@ function Body({ onClose }: { onClose: () => void }) {
               ))}
             </View>
 
-            <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-              API KEY {ai.hasKey ? '· SAVED' : ''}
-            </ThemedText>
+            <Label>{`API KEY${ai.hasKey ? ' · SAVED' : ''}`}</Label>
             <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
               <TextInput
                 value={key}
@@ -152,6 +221,7 @@ function Body({ onClose }: { onClose: () => void }) {
           </>
         ) : null}
       </ScrollView>
+      <PremiumSheet visible={showPaywall} onClose={() => setShowPaywall(false)} />
     </View>
   );
 }
@@ -166,14 +236,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   link: { color: '#e8734a', fontWeight: '600' },
+  inlineLink: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
   body: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.two },
   card: { borderRadius: 12, paddingHorizontal: Spacing.three },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.two,
-  },
   hint: { paddingHorizontal: Spacing.one, marginBottom: Spacing.two },
   label: { letterSpacing: 0.6, marginTop: Spacing.two, paddingHorizontal: Spacing.one },
   pills: { flexDirection: 'row', gap: Spacing.two },
@@ -181,12 +246,7 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: '#e8734a' },
   input: { fontSize: 16, paddingVertical: 12 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.one },
-  primary: {
-    backgroundColor: '#e8734a',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 10,
-  },
+  primary: { backgroundColor: '#e8734a', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10 },
   primaryText: { color: '#fff', fontWeight: '600' },
   forget: { paddingVertical: 8 },
   status: { paddingHorizontal: Spacing.one },

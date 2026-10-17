@@ -98,11 +98,13 @@ export default function SettingsScreen() {
   }, []);
   const binderyConnected = !!bindery.url && bindery.hasKey;
   const aiSummary =
-    ai.mode === 'byok'
-      ? ai.hasKey
-        ? `Own key · ${AI_MODELS.find((m) => m.id === ai.model)?.label ?? ai.model}`
-        : 'Own key · not set'
-      : 'Off';
+    ai.mode === 'cloud'
+      ? 'Arcanum Cloud'
+      : ai.mode === 'byok'
+        ? ai.hasKey
+          ? `Own key · ${AI_MODELS.find((m) => m.id === ai.model)?.label ?? ai.model}`
+          : 'Own key · not set'
+        : 'Off';
   const { sync, syncing } = useLibrarySync();
   const qc = useQueryClient();
   const downloads = useQuery({

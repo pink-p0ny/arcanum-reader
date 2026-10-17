@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStore } from '@/lib/store';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, useColorScheme } from 'react-native';
@@ -9,6 +9,7 @@ import { importEpubs } from '@/lib/library-folder';
 import { syncLibrary } from '@/lib/library';
 import { loadLocalOnly, loadSession, localOnlyStore, sessionStore } from '@/lib/session';
 import { ensureHiddenGenresLoaded } from '@/lib/genres';
+import { launchArg } from '@/lib/launch-args';
 import { loadSettings } from '@/lib/settings';
 import { flushPending } from '@/lib/sync';
 
@@ -63,8 +64,18 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [booted]);
 
-  if (!booted || !ready) return null;
   const signedIn = !!session || localOnly;
+
+  // `-arcanumRoute /book/-123` as a launch argument opens that screen once the tabs are up (screenshots).
+  useEffect(() => {
+    if (!booted || !signedIn) return;
+    const route = launchArg('arcanumRoute');
+    if (!route) return;
+    const t = setTimeout(() => router.push(route as never), 1500);
+    return () => clearTimeout(t);
+  }, [booted, signedIn]);
+
+  if (!booted || !ready) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

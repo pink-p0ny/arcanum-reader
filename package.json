@@ -34,12 +34,14 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^1.0.0",
+    "@types/node": "^26.6.5",
     "@types/react": "~19.2.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "playwright": "^1.64.1",
     "react-dom": "19.2.3",
     "rollup": "^4.64.7",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -52,7 +54,8 @@
     "build:reader": "node scripts/build-reader.mjs",
     "test:reader": "node scripts/test-reader.mjs",
     "prestart": "node scripts/build-reader.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/lib/*.test.ts"
   },
   "private": true
 }

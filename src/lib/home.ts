@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-
+import { bestRating, genreAffinity, inProgress, isFinished } from './taste';
 import { getBooks } from './db';
 import type { AppBookSummary } from './types';
+
+export { bestRating, genreAffinity, inProgress, isFinished } from './taste';
 
 export interface HomeSection {
   key: string;
@@ -20,34 +22,6 @@ export interface HomeData {
 
 const LIMIT = 14;
 
-export const isFinished = (b: AppBookSummary) => b.readStatus === 'READ' || (b.readProgress ?? 0) >= 99;
-export const inProgress = (b: AppBookSummary) =>
-  !isFinished(b) &&
-  (b.readStatus === 'READING' || b.readStatus === 'RE_READING' || (b.readProgress ?? 0) > 0);
-export const bestRating = (b: AppBookSummary) =>
-  b.goodreadsRating ?? b.hardcoverRating ?? b.amazonRating ?? 0;
-
-/**
- * How much the reader gravitates to each genre, from their own history: finished and in-progress books
- * and high personal ratings add weight, low ratings subtract. Also returns how many books carry each genre.
- */
-export function genreAffinity(books: AppBookSummary[]) {
-  const affinity = new Map<string, number>();
-  const counts = new Map<string, number>();
-  for (const b of books) {
-    const cats = b.categories ?? [];
-    let weight = 0;
-    if (isFinished(b)) weight += 2;
-    else if (inProgress(b)) weight += 1.5;
-    if ((b.personalRating ?? 0) >= 4) weight += 2;
-    if ((b.personalRating ?? 0) > 0 && (b.personalRating ?? 0) <= 2) weight -= 1;
-    for (const c of cats) {
-      counts.set(c, (counts.get(c) ?? 0) + 1);
-      if (weight) affinity.set(c, (affinity.get(c) ?? 0) + weight);
-    }
-  }
-  return { affinity, counts };
-}
 const byRating = (a: AppBookSummary, b: AppBookSummary) => bestRating(b) - bestRating(a);
 const byDate = (key: 'lastReadTime' | 'addedOn') => (a: AppBookSummary, b: AppBookSummary) =>
   (b[key] ?? '').localeCompare(a[key] ?? '');

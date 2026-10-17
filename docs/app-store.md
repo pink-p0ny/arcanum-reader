@@ -56,11 +56,11 @@ ebook,epub,reader,grimmory,booklore,self-hosted,library,highlights,notes,read al
 
 | Field | Value |
 |---|---|
-| Support URL | https://github.com/pink-p0ny/arcanum-reader (make public first) or a page on arcanum-reader.app |
-| Marketing URL | optional |
-| Privacy policy URL | required before public release; see below |
+| Support URL | https://arcanum-reader.app/support.html |
+| Marketing URL | https://arcanum-reader.app |
+| Privacy policy URL | https://arcanum-reader.app/privacy.html |
 
-## Privacy policy (draft, host anywhere)
+## Privacy policy (live at arcanum-reader.app/privacy.html; source in site/)
 
 Arcanum Reader does not collect, store or transmit any personal data to its developer. The app connects
 only to servers the user configures: a Grimmory or Booklore library server, optionally a Bindery server,

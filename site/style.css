@@ -1,0 +1,41 @@
+:root {
+  --bg: #130f26;
+  --bg-2: #1c1636;
+  --fg: #f3eee6;
+  --muted: #b3acc6;
+  --copper: #d2703f;
+  --copper-2: #f2b57f;
+  --glow: #a98bff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: radial-gradient(1200px 700px at 50% -10%, var(--bg-2), var(--bg) 70%);
+  color: var(--fg);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+a { color: var(--copper-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; }
+header.top img { width: 44px; height: 44px; border-radius: 10px; }
+header.top .name { font-weight: 700; font-size: 19px; letter-spacing: 0.2px; }
+header.top nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+header.top nav a { color: var(--muted); }
+h1 { font-size: 40px; line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.3px; }
+h2 { font-size: 22px; margin: 36px 0 8px; }
+p { margin: 0 0 14px; }
+.lede { font-size: 20px; color: var(--muted); margin-bottom: 28px; }
+.hero { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: center; margin-bottom: 44px; }
+.hero img { width: 180px; height: 180px; border-radius: 40px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+@media (min-width: 640px) { .hero { grid-template-columns: auto 1fr; } }
+.cta { display: inline-block; background: var(--copper); color: #fff; font-weight: 600; padding: 12px 20px; border-radius: 12px; }
+.cta:hover { text-decoration: none; filter: brightness(1.08); }
+.cta.soon { background: #3a3157; color: var(--muted); cursor: default; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+.muted { color: var(--muted); }
+.card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+footer { margin-top: 56px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 14px; }
+code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 6px; font-size: 15px; }

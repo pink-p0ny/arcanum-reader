@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support – Arcanum Reader</title>
+<meta name="description" content="Help with Arcanum Reader: connecting your Grimmory or Booklore server, sync, highlights, Bindery and AI picks.">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a href="/"><img src="/favicon.png" alt="Arcanum Reader"></a>
+    <span class="name"><a href="/" style="color:inherit">Arcanum Reader</a></span>
+    <nav><a href="/support.html">Support</a><a href="/privacy.html">Privacy</a></nav>
+  </header>
+
+  <h1>Support</h1>
+  <p class="lede">Email <a href="mailto:support@arcanum-reader.app">support@arcanum-reader.app</a>, or open an issue on <a href="https://github.com/pink-p0ny/arcanum-reader">GitHub</a>. A few answers first.</p>
+
+  <h2>What do I need?</h2>
+  <p>A <a href="https://grimmory.org">Grimmory</a> or <a href="https://github.com/booklore-app/booklore">Booklore</a> server you can reach from your iPad, and an account on it. The app does not come with books and does not host any.</p>
+
+  <h2>Signing in</h2>
+  <p>Enter the server address as you would in a browser, for example <code>https://books.example.net</code>, then your username and password. The app keeps a session on the device and refreshes it automatically; sign out from Settings.</p>
+
+  <h2>Sync</h2>
+  <p>Reading position, highlights and notes are saved on the device first and pushed to your server right away. If you are offline they are queued and sent the next time the app is open with a connection. Highlights made in Arcanum appear in your server's web reader at the same spot, and the other way round.</p>
+
+  <h2>Highlights and notes</h2>
+  <p>Long-press a word to select text. The system menu offers Copy, Look Up, Translate and Share; Highlight and Add Note sit next to them. Tap an existing highlight to change its colour or style, edit the note, or delete it.</p>
+
+  <h2>Read aloud</h2>
+  <p>Tap Listen in the reader. Arcanum uses the voices built into iPadOS; download higher-quality ones under Settings › Accessibility › Spoken Content › Voices on the iPad, and pick them from the voice button in the player bar.</p>
+
+  <h2>Surprise Me</h2>
+  <p>Draws one unread book, weighted by the genres you finish and rate highly, with a reason. "Try another" sets the book aside for sixty days; "Forget Surprise Me Skips" in Settings brings everything back. With your own Anthropic API key under Settings › AI Services, Claude makes the pick and you can tell it your mood.</p>
+
+  <h2>Bindery</h2>
+  <p>Under Settings › Bindery, enter your Bindery address and its API key (Bindery's Settings › General › Security). A "+ Request" button then appears on the Library tab. An admin key adds and searches for the book at once; a requester key files a request for an admin to approve.</p>
+
+  <h2>Something is wrong</h2>
+  <div class="card">
+    <p>Please include in your email:</p>
+    <ul>
+      <li>The app version (Settings, bottom of the page) and your iPadOS version.</li>
+      <li>Which server you use (Grimmory or Booklore) and its version.</li>
+      <li>What you did, what you expected, and what happened instead.</li>
+    </ul>
+    <p class="muted" style="margin:0">Never send your password or API keys.</p>
+  </div>
+
+  <footer>
+    <span>© 2026 Arcanum Reader</span>
+    <a href="/">Home</a>
+    <a href="/privacy.html">Privacy</a>
+  </footer>
+</div>
+</body>
+</html>

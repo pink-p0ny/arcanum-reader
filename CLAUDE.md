@@ -28,3 +28,7 @@
   falls back to `POST /api/v1/requests`. The server URL lives in kv, the key in SecureStore.
 - AI picks (`src/lib/ai.ts`) call the Anthropic Messages API from the device with the user's own key
   (SecureStore) and a forced `pick_book` tool. Only candidate titles and a taste summary are sent.
+- Pure logic lives in `*-core.ts` / `taste.ts` / `highlights-markdown.ts` with `node:test` tests run by
+  `npm test` (tsx); keep Expo imports out of those files. SQLite schema is at user_version 2 (sessions table).
+- Booklore has no `/api/v1/app/*` endpoints; `src/lib/providers/booklore.ts` maps its `/api/v1/books` DTOs.
+  The server kind is detected at sign-in (`detectKind` in session.ts) and stored on the session.

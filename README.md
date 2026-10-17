@@ -22,7 +22,11 @@ highlights sync both ways with the server.
   "try another" button. With your own Anthropic key it asks Claude instead and takes a mood.
 - Bindery integration: search Bindery's metadata providers and ask for books you do not have; an admin key
   adds and searches at once, a requester key files a request.
-- A library provider interface, so Booklore, a cloud-folder library or Calibre-Web can be added as backends.
+- Search inside a book, with results grouped by chapter and highlighted on the page.
+- Share a book's highlights and notes as Markdown to Files, Notes, Notion or Readwise.
+- Reading stats on Home: time this week, a day streak, and seven-day bars.
+- Works with Grimmory and Booklore servers (detected at sign-in) through a library provider interface, so a
+  cloud-folder library or Calibre-Web can be added as further backends.
 - Reading progress synced to the server (CFI + percentage) and restored on any device.
 - Text selection uses the system edit menu with Highlight and Add Note in front of Translate, Search, Copy
   and Share (needs a development or store build; Expo Go shows an in-app highlight bar instead).

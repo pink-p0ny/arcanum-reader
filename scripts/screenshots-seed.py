@@ -105,6 +105,23 @@ def rewrite_genres(epub_dir: str):
         print('genres', name, genres)
 
 
+ANNOTATIONS = {
+    'emma': [
+        {
+            'cfi': 'epubcfi(/6/6!/4/4[pgepubid00003]/4,/1:0,/1:43)',
+            'text': 'Emma Woodhouse, handsome, clever, and rich',
+            'color': '#FACC15', 'style': 'highlight', 'chapterTitle': 'Chapter I',
+            'note': 'One of the great opening lines. Everything that follows undoes it.',
+        },
+        {
+            'cfi': 'epubcfi(/6/56!/4/2[pgepubid00029]/8,/1:57,/1:90)',
+            'text': 'silly things do cease to be silly',
+            'color': '#60A5FA', 'style': 'underline', 'chapterTitle': 'Chapter XXVI',
+        },
+    ],
+}
+
+
 def write_sidecars(lib: str):
     files = sorted(f for f in os.listdir(lib) if f.endswith('.epub'))
     for i, f in enumerate(files):
@@ -116,6 +133,11 @@ def write_sidecars(lib: str):
             side['status'] = status
             if rating:
                 side['rating'] = rating
+        for i, a in enumerate(ANNOTATIONS.get(name, [])):
+            side['annotations'].append({
+                'id': i + 1, 'bookId': book_id(f), 'createdAt': iso(1 + i), 'updatedAt': iso(1 + i), **a,
+            })
+        side['nextAnnotationId'] = len(side['annotations']) + 1
         with open(os.path.join(lib, f'{name}.arcanum.json'), 'w') as fh:
             json.dump(side, fh, indent=2)
     print('sidecars', len(files))

@@ -219,7 +219,9 @@ await send({ type: 'ttsStop' });
 messages.length = 0;
 
 // Search the whole book, then jump to the first hit and clear.
-await send({ type: 'search', query: 'Netherfield', id: 1 });
+// READER_SEARCH overrides the term (default suits Pride and Prejudice); READER_DUMP=1 prints every hit's CFI.
+const term = process.env.READER_SEARCH ?? 'Netherfield';
+await send({ type: 'search', query: term, id: 1 });
 const hits = await waitFor('searchResults', 20000, (m) => m.id === 1);
 const sdone = await waitFor('searchDone', 30000, (m) => m.id === 1);
 console.log(
@@ -232,7 +234,8 @@ console.log(
   '| done:',
   !!sdone,
 );
-if (!hits.items.length || !/netherfield/i.test(hits.items[0].match)) throw new Error('bad search hit');
+if (process.env.READER_DUMP) for (const h of hits.items) console.log('HIT', JSON.stringify({ cfi: h.cfi, match: h.match, excerpt: h.excerpt ?? h.pre ?? '' }));
+if (!hits.items.length || !hits.items[0].match.toLowerCase().includes(term.toLowerCase())) throw new Error('bad search hit');
 messages.length = 0;
 await send({ type: 'goTo', target: hits.items[0].cfi });
 await waitFor('relocate', 10000);

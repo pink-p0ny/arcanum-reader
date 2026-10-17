@@ -40,6 +40,10 @@ GENRES = {
 }
 
 TITLES = {
+    'moby-dick': 'Moby-Dick',
+    'frankenstein': 'Frankenstein',
+    'jane-eyre': 'Jane Eyre',
+    'little-women': 'Little Women',
     'the-odyssey': 'The Odyssey',
     'war-of-the-worlds': 'The War of the Worlds',
     'poe-works': 'The Works of Edgar Allan Poe',

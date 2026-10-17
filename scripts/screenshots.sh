@@ -36,6 +36,7 @@ print(next(x['udid'] for r in d.values() for x in r if x['name']=='$NAME'))")
   xcrun simctl erase "$UDID"
   xcrun simctl boot "$UDID"
   xcrun simctl bootstatus "$UDID" -b >/dev/null
+  sleep 20  # first boot after an erase restarts SpringBoard once more
   xcrun simctl ui "$UDID" appearance light
   xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --wifiBars 3 --cellularBars 4
   xcrun simctl install "$UDID" "$APP"
@@ -66,6 +67,12 @@ print(next(x['udid'] for r in d.values() for x in r if x['name']=='$NAME'))")
     xcrun simctl terminate "$UDID" $BUNDLE 2>/dev/null || true
     if [[ "$2" == "-" ]]; then xcrun simctl launch "$UDID" $BUNDLE -arcanumLocalOnly 1 >/dev/null
     else xcrun simctl launch "$UDID" $BUNDLE -arcanumLocalOnly 1 -arcanumRoute "$2" >/dev/null; fi
+    # After an erase the simulator may still be settling; wait for the app process before the shot.
+    local n=0
+    until xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q "UIKitApplication:$BUNDLE" || [[ $n -ge 60 ]]; do
+      sleep 1; n=$((n + 1))
+      (( n % 10 == 0 )) && xcrun simctl launch "$UDID" $BUNDLE -arcanumLocalOnly 1 ${2:+-arcanumRoute "$2"} >/dev/null 2>&1 || true
+    done
     sleep "$3"
     xcrun simctl io "$UDID" screenshot --type png "$OUT/$PREFIX-$1.png" >/dev/null
     echo "  $PREFIX-$1.png"

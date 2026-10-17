@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useStore } from '@/lib/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +8,8 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   FONT_CHOICES,
   clamp,
+  isDefaultDisplay,
+  resetDisplaySettings,
   settingsStore,
   updateSettings,
   type ReaderSettings,
@@ -91,6 +93,13 @@ export function SettingsSheet({ visible, onClose }: Props) {
   const theme = useTheme();
   const s = useStore(settingsStore);
   const set = (patch: Partial<ReaderSettings>) => updateSettings(patch);
+  const atDefaults = isDefaultDisplay(s);
+
+  const confirmReset = () =>
+    Alert.alert('Reset Reader Settings?', 'Theme, font, spacing and layout go back to their defaults.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: () => void resetDisplaySettings() },
+    ]);
 
   const themes: { label: string; value: ReaderTheme }[] = [
     { label: 'Auto', value: 'system' },
@@ -185,6 +194,19 @@ export function SettingsSheet({ visible, onClose }: Props) {
             <ThemedText style={styles.label}>Hyphenation</ThemedText>
             <Switch value={s.hyphenate} onValueChange={(v) => set({ hyphenate: v })} />
           </View>
+
+          <Pressable
+            onPress={confirmReset}
+            disabled={atDefaults}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: atDefaults }}
+            style={({ pressed }) => [
+              styles.reset,
+              { backgroundColor: theme.backgroundElement, opacity: atDefaults ? 0.4 : pressed ? 0.7 : 1 },
+            ]}
+          >
+            <ThemedText style={styles.resetText}>Reset to Defaults</ThemedText>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -235,4 +257,11 @@ const styles = StyleSheet.create({
   },
   segRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   seg: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16 },
+  reset: {
+    marginTop: Spacing.two,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  resetText: { color: '#e8734a', fontWeight: '600', fontSize: 16 },
 });

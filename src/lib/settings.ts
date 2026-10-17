@@ -73,4 +73,30 @@ export async function updateSettings(patch: Partial<ReaderSettings>) {
   await kvSet(KEY, next);
 }
 
+/** Display settings shown in the Reader Settings sheet; TTS voice and speed are set from the TTS bar. */
+export const DISPLAY_SETTING_KEYS = [
+  'fontSize',
+  'lineHeight',
+  'sideMargin',
+  'verticalMargin',
+  'maxInlineSize',
+  'maxColumns',
+  'fontFamily',
+  'theme',
+  'flow',
+  'justify',
+  'hyphenate',
+] as const satisfies readonly (keyof ReaderSettings)[];
+
+export function isDefaultDisplay(s: ReaderSettings): boolean {
+  return DISPLAY_SETTING_KEYS.every((k) => s[k] === DEFAULT_READER_SETTINGS[k]);
+}
+
+/** Puts every display setting back to its default, leaving TTS voice and speed alone. */
+export async function resetDisplaySettings() {
+  const patch: Partial<ReaderSettings> = {};
+  for (const k of DISPLAY_SETTING_KEYS) (patch as Record<string, unknown>)[k] = DEFAULT_READER_SETTINGS[k];
+  await updateSettings(patch);
+}
+
 export const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));

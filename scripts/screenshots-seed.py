@@ -39,6 +39,19 @@ GENRES = {
     'yellow-wallpaper': ['Horror', 'Short Stories'],
 }
 
+TITLES = {
+    'the-odyssey': 'The Odyssey',
+    'war-of-the-worlds': 'The War of the Worlds',
+    'poe-works': 'The Works of Edgar Allan Poe',
+    'sherlock-holmes': 'The Adventures of Sherlock Holmes',
+    'twenty-thousand-leagues': 'Twenty Thousand Leagues Under the Sea',
+    'mysterious-affair-at-styles': 'The Mysterious Affair at Styles',
+    'jekyll-and-hyde': 'The Strange Case of Dr. Jekyll and Mr. Hyde',
+    'yellow-wallpaper': 'The Yellow Wallpaper',
+    'alice-in-wonderland': "Alice's Adventures in Wonderland",
+    'dorian-gray': 'The Picture of Dorian Gray',
+}
+
 # name -> (progress fraction, status, rating, days since last read)
 HISTORY = {
     'emma': (0.42, 'READING', None, 0),
@@ -79,6 +92,8 @@ def rewrite_genres(epub_dir: str):
                 text = re.sub(r'\s*<dc:subject[^>]*>.*?</dc:subject>', '', text, flags=re.S)
                 tags = ''.join(f'\n    <dc:subject>{g}</dc:subject>' for g in genres)
                 text = text.replace('</metadata>', f'{tags}\n  </metadata>', 1)
+                if name in TITLES:
+                    text = re.sub(r'(<dc:title[^>]*>).*?(</dc:title>)', lambda m: m.group(1) + TITLES[name] + m.group(2), text, count=1, flags=re.S)
                 data = text.encode('utf-8')
             out.append((info, data))
         tmp = path + '.tmp'

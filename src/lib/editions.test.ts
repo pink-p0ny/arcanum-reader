@@ -19,7 +19,7 @@ describe('editionKey', () => {
   it('ignores case, punctuation, bracketed notes and a leading article', () => {
     assert.equal(
       editionKey({ title: 'The Hobbit: Or There & Back (Illustrated)', authors: ['J.R.R. Tolkien'] }),
-      'hobbit or there back|j r r tolkien',
+      'hobbit or there and back|j r r tolkien',
     );
     assert.equal(
       editionKey({ title: 'Pride and Prejudice', authors: ['Jane Austen'] }),

@@ -7,6 +7,7 @@ import {
 } from '../../modules/icloud-container';
 import { kvGet, kvSet } from './db';
 import { parseEpubMeta, type EpubMeta } from './epub-meta';
+import { typeFromName } from './formats';
 import type { LibraryProvider } from './providers/types';
 import type { Annotation, AppBookDetail, AppBookSummary, ReadStatus } from './types';
 
@@ -88,7 +89,7 @@ export interface Sidecar {
 }
 
 const sidecarFile = (dir: Directory, name: string) =>
-  new File(dir, `${name.replace(/\.epub$/i, '')}.arcanum.json`);
+  new File(dir, `${name.replace(/\.[^.]+$/, '')}.arcanum.json`);
 
 function readSidecar(dir: Directory, name: string): Sidecar {
   const f = sidecarFile(dir, name);
@@ -135,9 +136,10 @@ function indexBook(file: File, id: number, previous: CachedMeta | undefined): Ca
   const name = file.name;
   const size = file.size ?? 0;
   if (previous && previous.size === size && previous.name === name) return previous;
-  let meta: Omit<EpubMeta, 'cover'> = { title: name.replace(/\.epub$/i, ''), authors: [] };
+  let meta: Omit<EpubMeta, 'cover'> = { title: name.replace(/\.[^.]+$/, ''), authors: [] };
   let coverUri = previous?.coverUri ?? null;
   try {
+    if (typeFromName(name) !== 'EPUB') throw new Error('metadata is only read from EPUB');
     const parsed = parseEpubMeta(file.bytesSync());
     const { cover, ...rest } = parsed;
     meta = { ...rest, title: rest.title || meta.title };
@@ -167,7 +169,7 @@ function toSummary(id: number, c: CachedMeta, s: Sidecar): AppBookSummary {
     lastReadTime: s.progress?.updatedAt,
     readProgress: s.progress ? s.progress.fraction * 100 : undefined,
     primaryFileId: id,
-    primaryFileType: 'EPUB',
+    primaryFileType: typeFromName(c.name) ?? 'EPUB',
     primaryFileName: c.name,
     coverUpdatedOn: String(c.size),
     isPhysical: false,
@@ -186,7 +188,7 @@ export async function scanFolder(): Promise<AppBookSummary[]> {
   const out: AppBookSummary[] = [];
   let changed = false;
   for (const entry of dir.list()) {
-    if (!(entry instanceof File) || !/\.epub$/i.test(entry.name)) continue;
+    if (!(entry instanceof File) || !typeFromName(entry.name)) continue;
     const id = folderBookId(entry.name);
     seen.add(id);
     const previous = metaCache.get(id);
@@ -215,7 +217,8 @@ export async function importEpubs(uris: string[]): Promise<number[]> {
   for (const uri of uris) {
     const src = new File(uri);
     if (!src.exists) continue;
-    const name = src.name.toLowerCase().endsWith('.epub') ? src.name : `${src.name}.epub`;
+    if (!typeFromName(src.name)) continue;
+    const name = src.name;
     const dest = new File(dir, name);
     if (dest.exists) dest.delete();
     src.copy(dest);
@@ -261,7 +264,7 @@ export const folderProvider: LibraryProvider = {
       ...summary,
       description: c.meta.description,
       publishedDate: c.meta.published,
-      fileTypes: ['EPUB'],
+      fileTypes: [summary.primaryFileType ?? 'EPUB'],
       files: [
         {
           id: bookId,
@@ -269,7 +272,7 @@ export const folderProvider: LibraryProvider = {
           fileName: c.name,
           isBook: true,
           folderBased: false,
-          bookType: 'EPUB',
+          bookType: summary.primaryFileType ?? 'EPUB',
           fileSizeKb: summary.fileSizeKb,
           isPrimary: true,
         },

@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { getDownload, removeDownload, setDownload } from './db';
+import { extensionFor } from './formats';
 import { isFolderBook } from './library-folder';
 import { getProvider } from './provider';
 import { createStore } from './store';
@@ -37,7 +38,7 @@ export async function downloadBook(bookId: number, fileId: number | null | undef
   if (source.url.startsWith('file://')) return registerLocalFile(bookId, fileId, source.url);
   const dir = booksDir();
   if (!dir.exists) dir.create({ intermediates: true });
-  const dest = new File(dir, `${bookId}.epub`);
+  const dest = new File(dir, `${bookId}.${extensionFor(bookType)}`);
   if (dest.exists) dest.delete();
   setState(bookId, { status: 'downloading', progress: 0 });
   try {

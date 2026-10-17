@@ -50,12 +50,17 @@ export default function LibraryScreen() {
 
   const addBooks = async () => {
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['application/epub+zip', 'public.item'],
+      type: [
+        'application/epub+zip',
+        'application/x-mobipocket-ebook',
+        'application/vnd.amazon.ebook',
+        'public.item',
+      ],
       multiple: true,
       copyToCacheDirectory: true,
     });
     if (res.canceled) return;
-    const uris = res.assets.filter((a) => /\.epub$/i.test(a.name)).map((a) => a.uri);
+    const uris = res.assets.filter((a) => /\.(epub|mobi|azw3?|kf8|fb2|prc)$/i.test(a.name)).map((a) => a.uri);
     if (!uris.length) return;
     await importEpubs(uris);
     await sync();

@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
 import { isOfflineError } from './api';
+import { collapseEditions } from './editions';
 import { folderProvider } from './library-folder';
 import { getProvider } from './provider';
 import { sessionStore } from './session';
@@ -36,7 +37,7 @@ export async function syncLibrary(): Promise<{ count: number }> {
 export function useLibrary(opts: { search?: string; sort: LibrarySort }) {
   return useQuery({
     queryKey: ['library', opts.sort, opts.search ?? ''],
-    queryFn: () => getBooks(opts),
+    queryFn: async () => collapseEditions(await getBooks(opts)),
     placeholderData: (prev) => prev,
   });
 }

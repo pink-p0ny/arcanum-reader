@@ -24,6 +24,7 @@ import { Spacing } from '@/constants/theme';
 import { getProvider } from '@/lib/provider';
 import { getBook, type LocalAnnotation } from '@/lib/db';
 import { downloadBook, downloadsStore, localBookFile } from '@/lib/downloads';
+import { pickReadableFile } from '@/lib/formats';
 import { readerPageUri } from '@/lib/reader-asset';
 import { resolveReaderSettings } from '@/lib/reader-theme';
 import { settingsStore } from '@/lib/settings';
@@ -120,12 +121,18 @@ export default function ReadScreen() {
         try {
           detail = await getProvider(bookId).bookDetail(bookId);
         } catch {}
-        const epub =
-          detail?.files?.find((f) => f.isBook && f.bookType === 'EPUB') ??
-          detail?.files?.find((f) => f.isBook);
-        const fileId = epub?.id ?? summary?.primaryFileId ?? null;
+        const pick = pickReadableFile(detail?.files, {
+          id: summary?.primaryFileId,
+          type: summary?.primaryFileType,
+          name: summary?.primaryFileName,
+        });
+        if (!pick)
+          throw new Error(
+            `This book is ${summary?.primaryFileType ?? 'in a format'} the reader cannot open yet.`,
+          );
+        const fileId = pick.id;
 
-        const file = (await localBookFile(bookId)) ?? (await downloadBook(bookId, fileId));
+        const file = (await localBookFile(bookId)) ?? (await downloadBook(bookId, fileId, pick.type));
 
         const [pageUri, annotations, position] = await Promise.all([
           readerPageUri(),
@@ -137,7 +144,7 @@ export default function ReadScreen() {
         setLoaded({
           pageUri,
           fileUri: file.uri,
-          fileName: epub?.fileName ?? `${bookId}.epub`,
+          fileName: pick.name,
           fileId,
           title: detail?.title ?? summary?.title ?? '',
           position: jumpCfi ? { cfi: jumpCfi, href: null, fraction: position?.fraction ?? 0 } : position,

@@ -19,8 +19,10 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isOfflineError } from '@/lib/api';
 import { getProvider } from '@/lib/provider';
-import { getBook, type LocalAnnotation } from '@/lib/db';
+import { getBook, getBooks, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
+import { siblingEditions } from '@/lib/editions';
+import { pickReadableFile } from '@/lib/formats';
 import { authorsLine } from '@/lib/library';
 import { shareHighlights } from '@/lib/export';
 import { loadAnnotations } from '@/lib/sync';
@@ -75,6 +77,10 @@ export default function BookScreen() {
     queryKey: ['annotations', bookId],
     queryFn: () => loadAnnotations(bookId),
   });
+  const editions = useQuery({
+    queryKey: ['editions', bookId],
+    queryFn: async () => siblingEditions(bookId, await getBooks({ sort: 'title' })),
+  });
   const dl = useStore(downloadsStore, (s) => s[bookId]);
 
   const book: (AppBookSummary & Partial<AppBookDetail>) | null | undefined = detail.data
@@ -89,16 +95,18 @@ export default function BookScreen() {
     );
   }
 
-  const epubFile =
-    detail.data?.files?.find((f) => f.isBook && f.bookType === 'EPUB') ??
-    detail.data?.files?.find((f) => f.isBook);
-  const isEpub = (book.primaryFileType ?? epubFile?.bookType ?? 'EPUB').toUpperCase() === 'EPUB';
+  const readable = pickReadableFile(detail.data?.files, {
+    id: book.primaryFileId,
+    type: book.primaryFileType,
+    name: book.primaryFileName,
+  });
+  const isEpub = !!readable;
   const downloaded = !!download.data;
   const progress = book.readProgress ?? 0;
 
   const startDownload = async () => {
     try {
-      await downloadBook(bookId, epubFile?.id ?? book.primaryFileId);
+      await downloadBook(bookId, readable?.id ?? book.primaryFileId, readable?.type);
       download.refetch();
     } catch (e) {
       Alert.alert('Download failed', isOfflineError(e) ? 'You appear to be offline.' : (e as Error).message);
@@ -194,9 +202,35 @@ export default function BookScreen() {
             </View>
           ) : (
             <ThemedText themeColor="textSecondary">
-              This book is {book.primaryFileType ?? 'not an EPUB'}; only EPUB reading is supported right now.
+              This book is {book.primaryFileType ?? 'in a format'}; the reader opens EPUB, MOBI, AZW3 and FB2.
+              PDF and comics are not supported yet.
             </ThemedText>
           )}
+
+          {(editions.data ?? []).length > 0 ? (
+            <View style={styles.editionsRow}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Also in your library as
+              </ThemedText>
+              {editions.data!.map((e) => (
+                <Pressable
+                  key={e.id}
+                  onPress={() => router.push({ pathname: '/book/[id]', params: { id: String(e.id) } })}
+                  hitSlop={6}
+                  style={[styles.editionChip, { backgroundColor: theme.backgroundElement }]}
+                >
+                  <ThemedText type="small" style={styles.editionText}>
+                    {e.type}
+                  </ThemedText>
+                </Pressable>
+              ))}
+              {readable ? (
+                <ThemedText type="small" themeColor="textSecondary">
+                  · this one is {readable.type}
+                </ThemedText>
+              ) : null}
+            </View>
+          ) : null}
 
           {progress > 0 ? (
             <ThemedText type="small" themeColor="textSecondary">
@@ -387,6 +421,9 @@ const styles = StyleSheet.create({
   },
   block: { gap: Spacing.two },
   h2: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  editionsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  editionChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  editionText: { fontWeight: '700' },
   h2Row: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   accent: { color: '#e8734a', fontWeight: '600' },
   body: { fontWeight: '400' },

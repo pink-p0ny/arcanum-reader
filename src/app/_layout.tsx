@@ -48,7 +48,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!booted) return;
     const handle = (url: string | null) => {
-      if (!url || !url.startsWith('file://') || !/\.epub$/i.test(url)) return;
+      if (!url || !url.startsWith('file://') || !/\.(epub|mobi|azw3?|kf8|fb2|prc)$/i.test(url)) return;
       importEpubs([url])
         .then(() => syncLibrary())
         .then(() => {

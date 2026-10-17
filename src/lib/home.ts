@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { bestRating, genreAffinity, inProgress, isFinished } from './taste';
 import { getBooks } from './db';
+import { collapseEditions } from './editions';
 import type { AppBookSummary } from './types';
 
 export { bestRating, genreAffinity, inProgress, isFinished } from './taste';
@@ -99,7 +100,7 @@ export function buildHome(books: AppBookSummary[]): HomeData {
 export function useHome() {
   return useQuery({
     queryKey: ['home'],
-    queryFn: async () => buildHome(await getBooks({ sort: 'title' })),
+    queryFn: async () => buildHome(collapseEditions(await getBooks({ sort: 'title' }))),
     placeholderData: (prev) => prev,
   });
 }

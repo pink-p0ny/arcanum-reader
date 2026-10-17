@@ -31,6 +31,11 @@ export function BookCard({ book, width, showProgress = true }: Props) {
       {({ pressed }) => (
         <View style={[styles.inner, { width, opacity: pressed ? 0.75 : 1 }]}>
           <BookCover book={book} width={width} showProgress={showProgress} />
+          {book.editions && book.editions.length > 1 ? (
+            <View style={styles.formats} pointerEvents="none">
+              <ThemedText style={styles.formatsText}>{book.editions.length} formats</ThemedText>
+            </View>
+          ) : null}
           <View style={[styles.meta, { width }]}>
             <ThemedText type="small" numberOfLines={2} style={styles.title}>
               {book.title}
@@ -49,6 +54,16 @@ const styles = StyleSheet.create({
   card: { alignSelf: 'flex-start' },
   inner: { alignItems: 'stretch' },
   meta: { marginTop: 8, gap: 0 },
+  formats: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  formatsText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   title: { fontWeight: '600', lineHeight: TITLE_LINE, minHeight: TITLE_LINE * 2 },
   author: { lineHeight: AUTHOR_LINE },
 });

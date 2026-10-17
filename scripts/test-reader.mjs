@@ -105,7 +105,7 @@ const tapTarget = () => {
   // A paragraph that is on the currently visible page (the iframe is wider than the viewport when paginated).
   const fr = window.frameElement.getBoundingClientRect();
   const w = window.parent.innerWidth;
-  for (const el of document.querySelectorAll('p')) {
+  for (const el of document.querySelectorAll('p, div, span')) {
     for (const r of el.getClientRects()) {
       const x = fr.left + r.left + 5;
       if (r.width > 40 && x > 0 && x < w) return { p: el, x: r.left + 5, y: r.top + 5 };
@@ -135,16 +135,20 @@ console.log('tap via click:', tap1.x.toFixed(2), '| tap via touch only:', tap2.x
 messages.length = 0;
 
 // Simulate a selection inside the rendered chapter and verify we get a CFI back.
-const sel = await frame.evaluate(() => {
-  const p = [...document.querySelectorAll('p')].find((el) => el.textContent.trim().length > 40);
+// Pick a long text node rather than a <p>: MOBI books often have none.
+const selectText = () => {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) if (node.textContent.trim().length > 40) break;
   const range = document.createRange();
-  range.setStart(p.firstChild, 0);
-  range.setEnd(p.firstChild, Math.min(30, p.firstChild.length));
+  range.setStart(node, 0);
+  range.setEnd(node, Math.min(30, node.length));
   const s = document.getSelection();
   s.removeAllRanges();
   s.addRange(range);
   return range.toString();
-});
+};
+const sel = await frame.evaluate(selectText);
 const selection = await waitFor('selection');
 console.log(
   'selection:',
@@ -160,7 +164,10 @@ if (!selection.cfi.startsWith('epubcfi(')) throw new Error('bad cfi');
 // (that is what lets iOS drag the selection handles); without one it must be, so swipes still work.
 const dragCancelled = (withSelection) =>
   frame.evaluate((keep) => {
-    const p = [...document.querySelectorAll('p')].find((el) => el.textContent.trim().length > 40);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) if (node.textContent.trim().length > 40) break;
+    const p = node.parentElement;
     if (!keep) document.getSelection().removeAllRanges();
     const r = p.getClientRects()[0];
     const mk = (x) => new Touch({ identifier: 7, target: p, clientX: x, clientY: r.top + 5 });
@@ -185,15 +192,7 @@ if (!cancelledWhenIdle) throw new Error('swipe no longer handled by the paginato
 await settle(300);
 messages.length = 0;
 // Restore the selection the following steps rely on.
-await frame.evaluate(() => {
-  const p = [...document.querySelectorAll('p')].find((el) => el.textContent.trim().length > 40);
-  const range = document.createRange();
-  range.setStart(p.firstChild, 0);
-  range.setEnd(p.firstChild, Math.min(30, p.firstChild.length));
-  const s = document.getSelection();
-  s.removeAllRanges();
-  s.addRange(range);
-});
+await frame.evaluate(selectText);
 await waitFor('selection');
 
 await send({ type: 'addAnnotation', cfi: selection.cfi, color: '#FACC15', style: 'highlight' });

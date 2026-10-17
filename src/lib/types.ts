@@ -20,6 +20,8 @@ export type ReadStatus =
 
 export interface AppBookSummary {
   id: number;
+  /** UI only: other server records of the same title, set by collapseEditions. */
+  editions?: { id: number; type: string }[];
   title: string;
   authors?: string[];
   thumbnailUrl?: string;

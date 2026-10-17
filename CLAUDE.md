@@ -21,3 +21,10 @@
   actool on it ("attempt to insert nil object"). The 1024px `assets/images/icon.png` is the shipped icon.
   To retry the layered icon, open the bundle in Icon Composer on a Mac with Xcode 26, save, then set
   `ios.icon` back to `./assets/expo.icon`.
+- Backends go through `src/lib/provider.ts` (`LibraryProvider` in `src/lib/providers/types.ts`). Screens and
+  sync code never call `src/lib/api.ts` directly; add a backend by implementing the interface.
+- Bindery client is `src/lib/bindery.ts` (API reference: raw.githubusercontent.com/vavallee/bindery/main/docs/API.md).
+  Auth is `X-Api-Key`; `POST /api/v1/author/book` adds+searches with an admin key, 403 for requester keys
+  falls back to `POST /api/v1/requests`. The server URL lives in kv, the key in SecureStore.
+- AI picks (`src/lib/ai.ts`) call the Anthropic Messages API from the device with the user's own key
+  (SecureStore) and a forced `pick_book` tool. Only candidate titles and a taste summary are sent.

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookCard } from '@/components/book-card';
 import { LargeTitle } from '@/components/large-title';
+import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
+import { useStore } from '@/lib/store';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,6 +31,10 @@ export default function LibraryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const binderyReady = useStore(binderyStore, (b) => !!b.url && b.hasKey);
+  useEffect(() => {
+    ensureBinderyLoaded();
+  }, []);
   const { width } = useWindowDimensions();
   const { category } = useLocalSearchParams<{ category?: string }>();
   const [search, setSearch] = useState('');
@@ -82,6 +88,12 @@ export default function LibraryScreen() {
                 <Pressable onPress={() => router.setParams({ category: undefined })} hitSlop={8}>
                   <ThemedText type="small" style={styles.accent}>
                     Clear
+                  </ThemedText>
+                </Pressable>
+              ) : binderyReady ? (
+                <Pressable onPress={() => router.push('/request')} hitSlop={8}>
+                  <ThemedText type="small" style={styles.accent}>
+                    + Request
                   </ThemedText>
                 </Pressable>
               ) : undefined

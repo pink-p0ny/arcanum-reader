@@ -18,6 +18,11 @@ highlights sync both ways with the server.
   (light / sepia / dark / auto), paged or scrolled flow, justification and hyphenation.
 - Highlights (four styles, six colors) and notes synced to Grimmory's annotation API, with an offline outbox.
 - Read aloud with the device's neural voices, sentence-by-sentence highlighting, speed and voice selection.
+- Surprise Me: one unread book drawn at random but weighted by your taste, with a reason and a
+  "try another" button. With your own Anthropic key it asks Claude instead and takes a mood.
+- Bindery integration: search Bindery's metadata providers and ask for books you do not have; an admin key
+  adds and searches at once, a requester key files a request.
+- A library provider interface, so Booklore, a cloud-folder library or Calibre-Web can be added as backends.
 - Reading progress synced to the server (CFI + percentage) and restored on any device.
 - Text selection uses the system edit menu with Highlight and Add Note in front of Translate, Search, Copy
   and Share (needs a development or store build; Expo Go shows an in-app highlight bar instead).

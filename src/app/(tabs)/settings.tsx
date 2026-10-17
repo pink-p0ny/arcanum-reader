@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@/lib/store';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AiSettingsSheet } from '@/components/ai-settings-sheet';
+import { BinderySettingsSheet } from '@/components/bindery-settings-sheet';
 import { LargeTitle } from '@/components/large-title';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Spacing } from '@/constants/theme';
@@ -14,6 +16,7 @@ import { clearLocalData, getBook, getDownloads } from '@/lib/db';
 import { booksDir, deleteDownload, formatBytes } from '@/lib/downloads';
 import { useLibrarySync } from '@/lib/library';
 import { AI_MODELS, aiStore, ensureAiLoaded } from '@/lib/ai';
+import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
 import { clearSkips } from '@/lib/lucky';
 import { logout, sessionStore } from '@/lib/session';
 import { DEFAULT_READER_SETTINGS, updateSettings } from '@/lib/settings';
@@ -67,12 +70,17 @@ function Row({
 export default function SettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const session = useStore(sessionStore, (s) => s.session);
   const ai = useStore(aiStore);
   const [showAi, setShowAi] = useState(false);
+  const bindery = useStore(binderyStore);
+  const [showBindery, setShowBindery] = useState(false);
   useEffect(() => {
     ensureAiLoaded();
+    ensureBinderyLoaded();
   }, []);
+  const binderyConnected = !!bindery.url && bindery.hasKey;
   const aiSummary =
     ai.mode === 'byok'
       ? ai.hasKey
@@ -138,6 +146,19 @@ export default function SettingsScreen() {
           Fonts, margins and themes are adjusted inside the reader with the Aa button.
         </ThemedText>
       </Section>
+
+      <Section title="Bindery">
+        <Row
+          label="Server"
+          value={binderyConnected ? bindery.url!.replace(/^https?:\/\//, '') : 'Not connected'}
+          onPress={() => setShowBindery(true)}
+        />
+        {binderyConnected ? <Row label="Request a Book" onPress={() => router.push('/request')} /> : null}
+        <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+          Ask Bindery for books you do not have; it finds them and drops them into Grimmory.
+        </ThemedText>
+      </Section>
+      <BinderySettingsSheet visible={showBindery} onClose={() => setShowBindery(false)} />
 
       <Section title="AI Services">
         <Row label="AI Picks" value={aiSummary} onPress={() => setShowAi(true)} />

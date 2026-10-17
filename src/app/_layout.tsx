@@ -62,6 +62,7 @@ export default function RootLayout() {
                 headerBlurEffect: 'regular',
               }}
             />
+            <Stack.Screen name="request" options={{ title: 'Request a Book', presentation: 'modal' }} />
             <Stack.Screen
               name="read/[id]"
               options={{

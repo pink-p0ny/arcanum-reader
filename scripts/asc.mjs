@@ -124,6 +124,86 @@ const commands = {
     for (const p of prices) console.log(p.id, p.attributes, JSON.stringify(p.relationships));
   },
 
+  async iapprice(iapId) {
+    const sched = await api(
+      'GET',
+      `/v2/inAppPurchases/${iapId}/iapPriceSchedule?include=baseTerritory`,
+    ).catch((e) => ({ error: e.message }));
+    console.log(JSON.stringify(sched).slice(0, 400));
+    if (sched?.data) {
+      const prices = await all(
+        `/v1/inAppPurchasePriceSchedules/${sched.data.id}/manualPrices?include=inAppPurchasePricePoint,territory`,
+      );
+      for (const p of prices.slice(0, 3))
+        console.log(p.attributes, JSON.stringify(p.relationships?.territory?.data));
+    }
+  },
+
+  /** Uploads one PNG as the App Review screenshot of every Arcanum Cloud product that lacks one. */
+  async screenshots(file) {
+    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
+    const { basename } = await import('node:path');
+    const bytes = readFileSync(file);
+    const md5 = createHash('md5').update(bytes).digest('hex');
+    const app = await appId();
+
+    const upload = async (createPath, type, relName, relType, id) => {
+      const created = (
+        await api('POST', createPath, {
+          data: {
+            type,
+            attributes: { fileName: basename(file), fileSize: bytes.length },
+            relationships: { [relName]: rel(relType, id) },
+          },
+        })
+      ).data;
+      for (const op of created.attributes.uploadOperations ?? []) {
+        const chunk = bytes.subarray(op.offset, op.offset + op.length);
+        const headers = Object.fromEntries((op.requestHeaders ?? []).map((h) => [h.name, h.value]));
+        const r = await fetch(op.url, { method: op.method, headers, body: chunk });
+        if (!r.ok) throw new Error(`upload chunk failed: ${r.status}`);
+      }
+      await api('PATCH', `${createPath}/${created.id}`, {
+        data: { type, id: created.id, attributes: { uploaded: true, sourceFileChecksum: md5 } },
+      });
+      return created.id;
+    };
+
+    for (const g of await all(`/v1/apps/${app}/subscriptionGroups`)) {
+      for (const s of await all(`/v1/subscriptionGroups/${g.id}/subscriptions`)) {
+        const has = await api('GET', `/v1/subscriptions/${s.id}/appStoreReviewScreenshot`).catch(() => null);
+        if (has?.data) {
+          console.log('has screenshot', s.attributes.productId);
+          continue;
+        }
+        const id = await upload(
+          '/v1/subscriptionAppStoreReviewScreenshots',
+          'subscriptionAppStoreReviewScreenshots',
+          'subscription',
+          'subscriptions',
+          s.id,
+        );
+        console.log('uploaded screenshot for', s.attributes.productId, id);
+      }
+    }
+    for (const i of await all(`/v1/apps/${app}/inAppPurchasesV2`)) {
+      const has = await api('GET', `/v2/inAppPurchases/${i.id}/appStoreReviewScreenshot`).catch(() => null);
+      if (has?.data) {
+        console.log('has screenshot', i.attributes.productId);
+        continue;
+      }
+      const id = await upload(
+        '/v1/inAppPurchaseAppStoreReviewScreenshots',
+        'inAppPurchaseAppStoreReviewScreenshots',
+        'inAppPurchaseV2',
+        'inAppPurchases',
+        i.id,
+      );
+      console.log('uploaded screenshot for', i.attributes.productId, id);
+    }
+  },
+
   async territories() {
     const t = await all('/v1/territories?limit=200');
     console.log(t.length, 'territories');

@@ -19,7 +19,7 @@ import { useStore } from '@/lib/store';
 
 export default function LoginScreen() {
   const theme = useTheme();
-  const [server, setServer] = useState('https://grimmory.example.com');
+  const [server, setServer] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export default function LoginScreen() {
             style={field}
             value={server}
             onChangeText={setServer}
-            placeholder="Server URL"
+            placeholder="https://books.example.com"
             placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}

@@ -10,7 +10,7 @@
   `assets/reader/reader.html` by string splicing, never `String.replace` (foliate uses `$$` identifiers).
 - The WebView loads `reader.html` from the Documents directory so WKWebView lets it XHR the downloaded EPUB
   (`allowingReadAccessToURL`). See `src/lib/reader-asset.ts`.
-- Run `npm run typecheck`, `npm run lint` and `npm run test:reader -- <epub>` before calling work done.
+- Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:reader -- <epub>` before calling work done.
 - The project is pinned to SDK 57 because that is what Expo Go in the App Store supports; do not bump to 58 until Expo Go does. Native tabs import from `expo-router/unstable-native-tabs` on this SDK. The dev machine has Xcode 16.1, so prefer Expo Go or EAS Build over local native builds.
 - `modules/webview-edit-menu` is a local Expo module (Swift) that inserts Highlight / Add Note into the system
   text-selection menu of WKWebView, Apple Books style. It is absent in Expo Go, where the reader falls back to

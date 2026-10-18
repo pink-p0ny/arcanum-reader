@@ -142,7 +142,7 @@ export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
   const json = await anthropic(
     {
       model: aiStore.get().model,
-      max_tokens: 300,
+      max_tokens: 600,
       system: SYSTEM,
       messages: [{ role: 'user', content: user }],
       tools: [
@@ -159,7 +159,8 @@ export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
           },
         },
       ],
-      tool_choice: { type: 'auto' },
+      // Forced: with "auto" the model often answers in prose first and runs out of tokens before picking.
+      tool_choice: { type: 'tool', name: 'pick_book' },
     },
     key,
   );
@@ -179,7 +180,11 @@ export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
       } catch {}
     }
   }
-  if (!input || typeof input.bookId !== 'number') throw new AiError('The model did not return a pick.');
+  if (input && typeof input.bookId === 'string' && /^-?\d+$/.test(input.bookId)) input.bookId = Number(input.bookId);
+  if (!input || typeof input.bookId !== 'number') {
+    const why = json?.stop_reason === 'max_tokens' ? 'ran out of room' : `stop reason ${json?.stop_reason ?? 'unknown'}`;
+    throw new AiError(`The model did not return a pick (${why}).`);
+  }
   const ok = req.candidates.some((c) => c.id === input.bookId);
   if (!ok) throw new AiError('The model chose a book that was not offered.');
   return { bookId: input.bookId, reason: (input.reason ?? '').trim() || 'Worth a try.' };

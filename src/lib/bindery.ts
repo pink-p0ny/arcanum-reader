@@ -233,17 +233,27 @@ export interface BinderyWanted {
   id: number;
   title: string;
   authorName?: string;
+  author?: string | { authorName?: string };
   status?: string;
   monitored?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-/** Books Bindery is still hunting for (admin keys only; requesters get a 403 which we swallow). */
+/**
+ * Books Bindery is still hunting for, newest first (admin keys only; requesters get a 403 which we swallow).
+ * The endpoint has no sort and pages oldest first, so a larger page is fetched and ordered here.
+ */
 export async function listWanted(limit = 20): Promise<BinderyWanted[]> {
   try {
     const res = await request<{ items: BinderyWanted[] } | BinderyWanted[]>(
-      `/api/v1/wanted/missing?limit=${limit}&offset=0`,
+      `/api/v1/wanted/missing?limit=500&offset=0`,
     );
-    return Array.isArray(res) ? res : (res?.items ?? []);
+    const items = Array.isArray(res) ? res : (res?.items ?? []);
+    return items
+      .map((w) => ({ ...w, authorName: w.authorName ?? (asText(w.author) || undefined) }))
+      .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '') || b.id - a.id)
+      .slice(0, limit);
   } catch (e) {
     if (e instanceof BinderyError && e.status === 403) return [];
     throw e;

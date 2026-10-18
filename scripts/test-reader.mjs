@@ -105,8 +105,33 @@ await settle();
 messages.length = 0;
 
 let selection = null;
-if (loaded.fixed) console.log('fixed layout: no taps, selections, highlights or read-aloud to test');
-else {
+if (loaded.fixed) {
+  console.log('fixed layout: no taps, selections, highlights or read-aloud to test');
+  // A leftward swipe on the rendered page turns to the next page.
+  const before = r4;
+  // The fixed-layout renderer replaces its iframes while it lays out a spread; retry until one holds still.
+  const swipeLeft = () => {
+    const el = document.body;
+    const mk = (x) => new Touch({ identifier: 3, target: el, clientX: x, clientY: 200 });
+    el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [mk(400)], changedTouches: [mk(400)] }));
+    el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: [mk(150)] }));
+  };
+  for (let attempt = 0; ; attempt++) {
+    await settle(700);
+    const live = page.frames().filter((f) => f !== page.mainFrame() && !f.isDetached());
+    try {
+      await live[live.length - 1].evaluate(swipeLeft);
+      break;
+    } catch (e) {
+      if (attempt >= 8) throw e;
+    }
+  }
+  const swiped = await waitFor('relocate', 10000, (m) => m.cfi !== before.cfi);
+  console.log('swipe →', swiped.cfi, swiped.fraction.toFixed(3));
+  if (swiped.fraction <= before.fraction) throw new Error('swipe did not advance');
+  await settle(300);
+  messages.length = 0;
+} else {
 // foliate's paginator keeps its iframe in a closed shadow root, so reach the chapter document through
 // Playwright's frame list.
 const frame = page.frames().find((f) => f !== page.mainFrame());

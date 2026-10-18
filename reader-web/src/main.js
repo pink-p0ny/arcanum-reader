@@ -131,6 +131,7 @@ function wireView(v) {
     applyDocStyles(doc);
     doc.addEventListener('selectionchange', () => scheduleSelection(doc, index));
     wireTaps(doc);
+    if (v.isFixedLayout) wireSwipes(doc);
   });
 
   v.addEventListener('draw-annotation', (e) => {
@@ -237,6 +238,39 @@ function wireTaps(doc) {
           a.click(); // foliate's link handler listens for click
         else handleTap(doc, t.clientX, t.clientY, target);
       }, 150);
+    },
+    { passive: true },
+  );
+}
+
+// foliate's fixed-layout renderer (PDF) turns pages on tap and keyboard only; the paginator handles swipes
+// itself. A quick, mostly horizontal, single-finger drag turns the page.
+function wireSwipes(doc) {
+  let start = null;
+  doc.addEventListener(
+    'touchstart',
+    (ev) => {
+      const t = ev.touches[0];
+      start = ev.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
+    },
+    { passive: true },
+  );
+  doc.addEventListener('touchcancel', () => (start = null), { passive: true });
+  doc.addEventListener(
+    'touchend',
+    (ev) => {
+      const s = start;
+      start = null;
+      const t = ev.changedTouches[0];
+      if (!s || !t || ev.touches.length > 0) return;
+      const sel = doc.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) || Date.now() - s.at > 700) return;
+      const rtl = view?.book?.dir === 'rtl';
+      if (dx < 0 !== rtl) view?.next();
+      else view?.prev();
     },
     { passive: true },
   );

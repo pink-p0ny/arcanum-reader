@@ -139,31 +139,30 @@ export async function aiPick(req: AiPickRequest): Promise<AiPickResult> {
     '\nCandidates (id | title | authors | series | genres | rating):',
     ...lines,
   ].join('\n');
-  const json = await anthropic(
+  const tools = [
     {
-      model: aiStore.get().model,
-      max_tokens: 600,
-      system: SYSTEM,
-      messages: [{ role: 'user', content: user }],
-      tools: [
-        {
-          name: 'pick_book',
-          description: 'Choose one candidate book by id and explain why in one short sentence.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              bookId: { type: 'integer', description: 'The id of the chosen candidate' },
-              reason: { type: 'string', description: 'At most 30 words, second person, no spoilers' },
-            },
-            required: ['bookId', 'reason'],
-          },
+      name: 'pick_book',
+      description: 'Choose one candidate book by id and explain why in one short sentence.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          bookId: { type: 'integer', description: 'The id of the chosen candidate' },
+          reason: { type: 'string', description: 'At most 30 words, second person, no spoilers' },
         },
-      ],
-      // Forced: with "auto" the model often answers in prose first and runs out of tokens before picking.
-      tool_choice: { type: 'tool', name: 'pick_book' },
+        required: ['bookId', 'reason'],
+      },
     },
-    key,
-  );
+  ];
+  const messages: { role: 'user' | 'assistant'; content: unknown }[] = [{ role: 'user', content: user }];
+  const base = { model: aiStore.get().model, max_tokens: 1024, system: SYSTEM, tools };
+  // Forced tool use (`tool_choice: tool`) is refused by some models, so the model decides; when it answers
+  // in prose instead, one follow-up turn asks for the call.
+  let json = await anthropic({ ...base, messages, tool_choice: { type: 'auto' } }, key);
+  if (!(json?.content ?? []).some((b: { type: string }) => b.type === 'tool_use')) {
+    messages.push({ role: 'assistant', content: json?.content ?? [] });
+    messages.push({ role: 'user', content: 'Now call the pick_book tool with your choice.' });
+    json = await anthropic({ ...base, messages, tool_choice: { type: 'auto' } }, key);
+  }
   const content: { type: string; input?: unknown; text?: string }[] = json?.content ?? [];
   const block = content.find((b) => b.type === 'tool_use');
   let input = block?.input as Partial<AiPickResult> | undefined;

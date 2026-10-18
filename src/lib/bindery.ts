@@ -113,6 +113,8 @@ export interface BinderyHit {
   ratingsCount?: number;
   coverUrl?: string;
   remoteCover?: string;
+  /** Bindery's own field name for the cover. */
+  imageUrl?: string;
   images?: { url: string }[];
   /** Set when the book is already in Bindery's library. */
   libraryBookId?: number;
@@ -120,13 +122,42 @@ export interface BinderyHit {
   seriesPosition?: string;
 }
 
-export const hitAuthor = (h: BinderyHit) => h.authorName ?? h.author ?? '';
-export const hitYear = (h: BinderyHit) =>
-  h.year ?? (h.releaseDate ? Number(h.releaseDate.slice(0, 4)) : null);
-export const hitCover = (h: BinderyHit) => h.coverUrl ?? h.remoteCover ?? h.images?.[0]?.url ?? null;
+/** Whatever a provider put in a text field, as a string: objects with a name/title, arrays joined. */
+export function asText(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(asText).filter(Boolean).join(', ');
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return asText(o.name ?? o.title ?? o.label ?? '');
+  }
+  return '';
+}
 
-export function searchBooks(term: string) {
-  return request<BinderyHit[]>(`/api/v1/search/book?term=${encodeURIComponent(term.trim())}`);
+export const hitAuthor = (h: BinderyHit) => asText(h.authorName ?? h.author);
+export const hitYear = (h: BinderyHit) => {
+  if (typeof h.year === 'number') return h.year;
+  const y = typeof h.releaseDate === 'string' ? Number(h.releaseDate.slice(0, 4)) : NaN;
+  return Number.isFinite(y) && y > 0 ? y : null;
+};
+export const hitCover = (h: BinderyHit) =>
+  [h.coverUrl, h.remoteCover, h.imageUrl, h.images?.[0]?.url].find((u) => typeof u === 'string' && u) ?? null;
+export const hitRating = (h: BinderyHit) => {
+  const r = Number(h.averageRating);
+  return Number.isFinite(r) && r > 0 ? r : null;
+};
+
+export async function searchBooks(term: string): Promise<BinderyHit[]> {
+  const res = await request<BinderyHit[] | { items?: BinderyHit[]; results?: BinderyHit[] }>(
+    `/api/v1/search/book?term=${encodeURIComponent(term.trim())}`,
+  );
+  const list = Array.isArray(res) ? res : (res?.items ?? res?.results ?? []);
+  return list.filter((h) => h && typeof h === 'object' && h.foreignBookId != null).map((h, i) => ({
+    ...h,
+    foreignBookId: String(h.foreignBookId ?? i),
+    title: asText(h.title) || 'Untitled',
+  }));
 }
 
 /** Cover images go through Bindery's cached proxy, which takes the key as a query parameter on GET. */

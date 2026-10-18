@@ -9,12 +9,14 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  asText,
   binderyStore,
   coverSource,
   ensureBinderyLoaded,
   getBook,
   hitAuthor,
   hitCover,
+  hitRating,
   hitYear,
   listRequests,
   listWanted,
@@ -22,6 +24,28 @@ import {
   type BinderyHit,
 } from '@/lib/bindery';
 import { useStore } from '@/lib/store';
+
+/** A failure on this screen shows here instead of taking the whole app down with it. */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  const theme = useTheme();
+  const router = useRouter();
+  return (
+    <View style={[styles.screen, styles.errorScreen, { backgroundColor: theme.background }]}>
+      <ThemedText type="title">Something went wrong</ThemedText>
+      <ThemedText themeColor="textSecondary" selectable style={styles.errorText}>
+        {error.message}
+      </ThemedText>
+      <View style={styles.errorActions}>
+        <Pressable onPress={retry} style={styles.get}>
+          <ThemedText style={styles.getText}>Try Again</ThemedText>
+        </Pressable>
+        <Pressable onPress={() => router.back()} hitSlop={8}>
+          <ThemedText style={{ color: '#e8734a' }}>Close</ThemedText>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 /** Search Bindery's metadata providers and ask for a book that is not in the library yet. */
 export default function RequestScreen() {
@@ -119,9 +143,9 @@ export default function RequestScreen() {
               </ThemedText>
             ) : null}
 
-            {(results.data ?? []).map((hit) => (
+            {(results.data ?? []).map((hit, i) => (
               <Hit
-                key={hit.foreignBookId}
+                key={`${hit.foreignBookId}-${i}`}
                 hit={hit}
                 state={done[hit.foreignBookId] ?? (hit.libraryBookId ? 'In Bindery' : null)}
                 busy={busy === hit.foreignBookId}
@@ -137,9 +161,9 @@ export default function RequestScreen() {
                 {requests.data[1].map((w) => (
                   <View key={`w${w.id}`} style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
                     <View style={styles.rowText}>
-                      <ThemedText numberOfLines={1}>{w.title}</ThemedText>
+                      <ThemedText numberOfLines={1}>{asText(w.title)}</ThemedText>
                       <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                        {w.authorName ?? ''}
+                        {asText(w.authorName)}
                       </ThemedText>
                     </View>
                     <ThemedText type="small" themeColor="textSecondary">
@@ -150,14 +174,14 @@ export default function RequestScreen() {
                 {requests.data[0].map((r) => (
                   <View key={`r${r.id}`} style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
                     <View style={styles.rowText}>
-                      <ThemedText numberOfLines={1}>{r.title}</ThemedText>
+                      <ThemedText numberOfLines={1}>{asText(r.title)}</ThemedText>
                       <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                        {r.authorName ?? ''}
-                        {r.declineReason ? ` · ${r.declineReason}` : ''}
+                        {asText(r.authorName)}
+                        {r.declineReason ? ` · ${asText(r.declineReason)}` : ''}
                       </ThemedText>
                     </View>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {r.fulfilled ? 'Arrived' : r.status === 'pending' ? 'Pending' : r.status}
+                      {r.fulfilled ? 'Arrived' : r.status === 'pending' ? 'Pending' : asText(r.status)}
                     </ThemedText>
                   </View>
                 ))}
@@ -192,6 +216,8 @@ function Hit({
     };
   }, [remote]);
   const year = hitYear(hit);
+  const rating = hitRating(hit);
+  const series = asText(hit.series);
   return (
     <View style={[styles.hit, { backgroundColor: theme.backgroundElement }]}>
       <View style={[styles.cover, { backgroundColor: theme.backgroundSelected }]}>
@@ -199,17 +225,17 @@ function Hit({
       </View>
       <View style={styles.rowText}>
         <ThemedText numberOfLines={2} style={styles.title}>
-          {hit.title}
+          {asText(hit.title)}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
           {hitAuthor(hit)}
           {year ? ` · ${year}` : ''}
-          {hit.averageRating ? ` · ★ ${hit.averageRating.toFixed(1)}` : ''}
+          {rating ? ` · ★ ${rating.toFixed(1)}` : ''}
         </ThemedText>
-        {hit.series ? (
+        {series ? (
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-            {hit.series}
-            {hit.seriesPosition ? ` #${hit.seriesPosition}` : ''}
+            {series}
+            {hit.seriesPosition ? ` #${asText(hit.seriesPosition)}` : ''}
           </ThemedText>
         ) : null}
       </View>
@@ -231,6 +257,9 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.two },
   empty: { alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.six },
   center: { textAlign: 'center' },
+  errorScreen: { padding: Spacing.four, gap: Spacing.three, justifyContent: 'center' },
+  errorText: { fontFamily: 'Menlo' },
+  errorActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four },
   search: {
     flexDirection: 'row',
     alignItems: 'center',

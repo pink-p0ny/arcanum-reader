@@ -2,6 +2,7 @@
 // so CFIs for progress and highlights stay compatible with the server and the web UI.
 import '../foliate/view.js';
 import { Overlayer } from '../foliate/overlayer.js';
+import { makePDF } from './pdf.js';
 import { makeTxt } from './txt.js';
 
 const post = (msg) => {
@@ -43,6 +44,9 @@ function loadBytes(url) {
   });
 }
 
+/** What `open` was last called with, so a PDF can be reopened in the other mode from the settings sheet. */
+let lastOpen = null;
+
 async function open({ url, name, position, settings: s, annotations }) {
   try {
     settings = s;
@@ -51,14 +55,21 @@ async function open({ url, name, position, settings: s, annotations }) {
     const blob = await loadBytes(url);
     const fileName = name || 'book.epub';
     const file = new File([blob], fileName, { type: mimeFor(fileName) });
+    lastOpen = { url, name, annotations };
 
     if (view) view.remove();
     view = document.createElement('foliate-view');
     document.body.append(view);
     wireView(view);
 
-    // foliate sniffs every format it knows; plain text has no signature, so it is picked by name.
-    await view.open(isTxt(file) ? await makeTxt(file) : file);
+    // foliate sniffs every format it knows; plain text has no signature, so it is picked by name, and PDFs
+    // go through our loader so the reflow setting applies.
+    const source = isTxt(file)
+      ? await makeTxt(file)
+      : (await isPdf(file))
+        ? await makePDF(file, { reflow: s.pdfReflow !== false })
+        : file;
+    await view.open(source);
     applyRendererSettings(s);
 
     for (const a of annotations ?? []) annotationStyles.set(a.cfi, { color: a.color, style: a.style });
@@ -69,8 +80,10 @@ async function open({ url, name, position, settings: s, annotations }) {
       title: book.metadata?.title ?? '',
       toc: serializeToc(book.toc ?? []),
       sections: book.sections?.length ?? 0,
-      // Fixed layout (PDF): pages are images with a text layer; no highlights, no read-aloud.
+      // Fixed layout (PDF pages): images with a text layer; no highlights, no read-aloud.
       fixed: !!view.isFixedLayout,
+      // For PDFs: whether the file has text to reflow, and which mode is showing.
+      pdf: book.pdf ?? null,
     });
 
     if (position?.cfi) await view.init({ lastLocation: position.cfi });
@@ -98,6 +111,11 @@ const MIME = {
 const ext = (name) => (name ?? '').toLowerCase().split('.').pop();
 const mimeFor = (name) => MIME[ext(name)] ?? 'application/octet-stream';
 const isTxt = (file) => file.type === 'text/plain' || ['txt', 'text'].includes(ext(file.name));
+const isPdf = async (file) => {
+  if (ext(file.name) === 'pdf') return true;
+  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  return head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+};
 
 function serializeToc(items, depth = 0) {
   if (!items || depth > 6) return [];
@@ -503,9 +521,17 @@ const ttsHandlers = {
 const handlers = {
   open,
   settings: ({ settings: s }) => {
+    const pdf = view?.book?.pdf;
+    const wantReflow = s.pdfReflow !== false;
     settings = s;
     applyHostColors(s);
     applyRendererSettings(s);
+    // Switching a text PDF between pages and reflowed text means a different book object: reopen on the
+    // same page (both modes have one section per page, so the spine part of the CFI carries over).
+    if (pdf?.text && pdf.reflow !== wantReflow && lastOpen) {
+      const cfi = view.lastLocation?.cfi?.replace(/!.*\)$/, ')') ?? null;
+      open({ ...lastOpen, position: cfi ? { cfi, href: null, fraction: 0 } : null, settings: s });
+    }
   },
   next: () => view?.next(),
   prev: () => view?.prev(),

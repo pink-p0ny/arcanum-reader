@@ -9,7 +9,15 @@ import type { Annotation } from '@/lib/types';
 
 export type ReaderEvent =
   | { type: 'ready' }
-  | { type: 'loaded'; title: string; toc: TocItem[]; sections: number; fixed?: boolean }
+  | {
+      type: 'loaded';
+      title: string;
+      toc: TocItem[];
+      sections: number;
+      fixed?: boolean;
+      /** PDFs only: whether the file has text to reflow and which mode opened. */
+      pdf?: { text: boolean; reflow: boolean } | null;
+    }
   | {
       type: 'relocate';
       cfi: string | null;

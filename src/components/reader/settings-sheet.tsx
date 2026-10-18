@@ -19,6 +19,8 @@ import {
 interface Props {
   visible: boolean;
   onClose: () => void;
+  /** Set while a PDF is open: whether it has text to reflow, and which mode is showing. */
+  pdf?: { text: boolean; reflow: boolean } | null;
 }
 
 function Stepper({
@@ -89,11 +91,13 @@ function Segmented<T extends string | null>({
   );
 }
 
-export function SettingsSheet({ visible, onClose }: Props) {
+export function SettingsSheet({ visible, onClose, pdf }: Props) {
   const theme = useTheme();
   const s = useStore(settingsStore);
   const set = (patch: Partial<ReaderSettings>) => updateSettings(patch);
   const atDefaults = isDefaultDisplay(s);
+  // Rendered PDF pages take none of the typography settings; only the theme tint applies.
+  const typography = !pdf || pdf.reflow;
 
   const confirmReset = () =>
     Alert.alert('Reset Reader Settings?', 'Theme, font, spacing and layout go back to their defaults.', [
@@ -118,7 +122,29 @@ export function SettingsSheet({ visible, onClose }: Props) {
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.content}>
+          {pdf ? (
+            <>
+              <View style={styles.row}>
+                <ThemedText style={styles.label}>Reflow PDF text</ThemedText>
+                <Switch
+                  value={pdf.text && s.pdfReflow}
+                  disabled={!pdf.text}
+                  onValueChange={(v) => set({ pdfReflow: v })}
+                />
+              </View>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
+                {!pdf.text
+                  ? 'This PDF has no text layer, so its pages are shown as images.'
+                  : pdf.reflow
+                    ? 'The text is laid out like an ebook. Turn this off to see the original pages.'
+                    : 'Showing the original pages: font and spacing come from the file.'}
+              </ThemedText>
+            </>
+          ) : null}
+
           <Segmented label="Theme" options={themes} value={s.theme} onChange={(v) => set({ theme: v })} />
+          {typography ? (
+            <>
 
           <Stepper
             label="Font size"
@@ -194,6 +220,8 @@ export function SettingsSheet({ visible, onClose }: Props) {
             <ThemedText style={styles.label}>Hyphenation</ThemedText>
             <Switch value={s.hyphenate} onValueChange={(v) => set({ hyphenate: v })} />
           </View>
+            </>
+          ) : null}
 
           <Pressable
             onPress={confirmReset}
@@ -263,5 +291,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  note: { marginTop: -6, marginBottom: 12 },
   resetText: { color: '#e8734a', fontWeight: '600', fontSize: 16 },
 });

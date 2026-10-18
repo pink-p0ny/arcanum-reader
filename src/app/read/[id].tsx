@@ -83,8 +83,10 @@ export default function ReadScreen() {
   const [toc, setToc] = useState<TocItem[]>([]);
   /** The page has opened the book; errors before that are load failures. */
   const pageLoaded = useRef(false);
-  /** Fixed-layout book (PDF): rendered pages, so no read-aloud. */
+  /** Fixed-layout book (PDF pages): rendered pages, so no read-aloud. */
   const [fixed, setFixed] = useState(false);
+  /** Open PDF: whether it has text and which mode is showing, for the settings sheet. */
+  const [pdf, setPdf] = useState<{ text: boolean; reflow: boolean } | null>(null);
   const [showToc, setShowToc] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState<SearchState | null>(null);
@@ -220,6 +222,7 @@ export default function ReadScreen() {
           pageLoaded.current = true;
           setToc(e.toc);
           setFixed(!!e.fixed);
+          setPdf(e.pdf ?? null);
           break;
         case 'relocate': {
           const next = {
@@ -564,7 +567,7 @@ export default function ReadScreen() {
         }}
         onClose={() => setShowToc(false)}
       />
-      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} pdf={pdf} />
       <NoteModal
         key={
           noteTarget

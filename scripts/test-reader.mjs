@@ -72,12 +72,14 @@ const settings = {
   colors: { bg: '#f4ecd8', fg: '#5b4636', link: '#8a5a2b' },
   dark: false,
   forceColors: true,
+  // PDFs reflow by default; READER_PDF_PAGES=1 tests the rendered-page mode instead.
+  pdfReflow: !process.env.READER_PDF_PAGES,
 };
 await send({ type: 'open', url: bookUrl, name: `book.${ext}`, position: null, settings, annotations: [] });
 const errEarly = messages.find((m) => m.type === 'error');
 if (errEarly) console.log('page error:', errEarly.message);
 const loaded = await waitFor('loaded', 30000);
-console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '');
+console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '', loaded.pdf ? JSON.stringify(loaded.pdf) : '');
 const first = await waitFor('relocate');
 console.log('relocate:', first.cfi, first.fraction.toFixed(4), first.tocLabel);
 await settle();
@@ -294,7 +296,9 @@ await send({
 await waitFor('loaded', 30000);
 const r5 = await waitFor('relocate');
 console.log('reopen at cfi → fraction', r5.fraction.toFixed(3), '(expected ~', r4.fraction.toFixed(3), ')');
-if (Math.abs(r5.fraction - r4.fraction) > 0.02) throw new Error('did not restore position');
+// Reopening switches to scrolled flow, which lays the section out differently; with one section per
+// page (PDF) a section is a large share of the book, so allow a section's worth of drift.
+if (Math.abs(r5.fraction - r4.fraction) > Math.max(0.02, 1 / loaded.sections)) throw new Error('did not restore position');
 
 const errors = messages.filter((m) => m.type === 'error');
 if (errors.length) console.log('errors:', errors);

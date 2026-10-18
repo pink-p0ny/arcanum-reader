@@ -19,6 +19,8 @@ export interface ReaderSettings {
   flow: ReaderFlow;
   justify: boolean;
   hyphenate: boolean;
+  /** PDFs with a text layer: rebuild the text as a reflowable book (true) or show the rendered pages. */
+  pdfReflow: boolean;
   ttsRate: number;
   ttsVoice: string | null;
 }
@@ -35,6 +37,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   flow: 'paginated',
   justify: true,
   hyphenate: true,
+  pdfReflow: true,
   ttsRate: 1,
   ttsVoice: null,
 };
@@ -86,6 +89,7 @@ export const DISPLAY_SETTING_KEYS = [
   'flow',
   'justify',
   'hyphenate',
+  'pdfReflow',
 ] as const satisfies readonly (keyof ReaderSettings)[];
 
 export function isDefaultDisplay(s: ReaderSettings): boolean {

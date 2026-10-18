@@ -16,8 +16,13 @@
   features (`Iterator` helpers) missing before iOS 18.4. `build-reader.mjs` turns the pdf.js ES modules into
   classic scripts (`assets/reader/*.webjs`, Metro asset ext `webjs`) because WKWebView refuses module scripts
   from file URLs; both run on the main thread (pdf.js uses its in-page worker when `pdfjsWorker` is global).
-  PDFs are fixed layout: pages rendered to canvas, no highlights or read-aloud, progress by page
-  (`pageFromCfi`, servers get `pdfProgress`). TXT (`reader-web/src/txt.js`) becomes a reflowable book with
+  PDFs open in one of two modes, both with one foliate section per page so progress stays by page
+  (`pageFromCfi`, servers get `pdfProgress`) and a position survives switching: `pdfReflow` (default, Reader
+  Settings) pulls the text out with pdf.js and rebuilds paragraphs/headings as a reflowable book (highlights,
+  search, read-aloud and every typography setting work; running heads and page numbers are dropped), while
+  pages mode renders each page to a canvas with a text layer (fixed layout: no highlights or read-aloud,
+  swipe handled in main.js). Scanned PDFs with no text layer always get pages. `READER_PDF_PAGES=1` makes
+  `test:reader` use pages mode. TXT (`reader-web/src/txt.js`) becomes a reflowable book with
   chapters guessed from heading lines; servers have no TXT type, so it is a folder-library format only.
 - `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/TXT; `READER_SEARCH` sets the search term.
   Reader errors before the book opens are shown on screen and stored in kv `lastReaderError`

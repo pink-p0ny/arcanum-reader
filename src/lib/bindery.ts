@@ -105,7 +105,8 @@ export interface BinderyHit {
   foreignBookId: string;
   title: string;
   authorName?: string;
-  author?: string;
+  /** Bindery nests the author as an object (`{ authorName, foreignAuthorId }`); other providers send a name. */
+  author?: string | { authorName?: string; name?: string; foreignAuthorId?: string };
   foreignAuthorId?: string;
   releaseDate?: string;
   year?: number;
@@ -130,12 +131,14 @@ export function asText(v: unknown): string {
   if (Array.isArray(v)) return v.map(asText).filter(Boolean).join(', ');
   if (typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    return asText(o.name ?? o.title ?? o.label ?? '');
+    return asText(o.authorName ?? o.name ?? o.title ?? o.label ?? '');
   }
   return '';
 }
 
 export const hitAuthor = (h: BinderyHit) => asText(h.authorName ?? h.author);
+const hitAuthorId = (h: BinderyHit) =>
+  h.foreignAuthorId ?? (typeof h.author === 'object' && h.author ? h.author.foreignAuthorId : undefined);
 export const hitYear = (h: BinderyHit) => {
   if (typeof h.year === 'number') return h.year;
   const y = typeof h.releaseDate === 'string' ? Number(h.releaseDate.slice(0, 4)) : NaN;
@@ -182,7 +185,13 @@ export async function getBook(hit: BinderyHit): Promise<GetBookOutcome> {
   try {
     const added = await request<{ id?: number }>('/api/v1/author/book', {
       method: 'POST',
-      body: JSON.stringify({ foreignBookId: hit.foreignBookId, monitored: true, searchOnAdd: true }),
+      body: JSON.stringify({
+        foreignBookId: hit.foreignBookId,
+        foreignAuthorId: hitAuthorId(hit),
+        authorName: hitAuthor(hit) || undefined,
+        monitored: true,
+        searchOnAdd: true,
+      }),
     });
     return { status: 'added', bookId: added?.id };
   } catch (e) {

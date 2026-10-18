@@ -6,7 +6,20 @@ import type { AppBookSummary } from './types';
  * Pure helpers, no Expo imports, so they run in plain Node for tests.
  */
 
-export const DEFAULT_HIDDEN_GENRES = ['Fiction', 'Nonfiction', 'General', 'Adult', 'Literature'];
+export const DEFAULT_HIDDEN_GENRES = [
+  'Fiction',
+  'Nonfiction',
+  'General',
+  'Adult',
+  'Literature',
+  // Formats that arrive as subjects from store listings; they describe the file, not the book.
+  'Audiobook',
+  'Audiobooks',
+  'Ebook',
+  'Ebooks',
+  'Kindle',
+  'Unabridged',
+];
 
 /** Case, spacing and punctuation insensitive, so "Non-Fiction" and "nonfiction" are the same genre. */
 export const normalizeGenre = (name: string) => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');

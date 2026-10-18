@@ -1,18 +1,25 @@
-// Smoke-tests the bundled reader page in headless Chromium with a real EPUB, driving it over the same
-// postMessage bridge the app uses. Usage: node scripts/test-reader.mjs path/to/book.epub
+// Smoke-tests the bundled reader page in headless Chromium with a real book (EPUB, MOBI, AZW3, FB2, PDF or
+// TXT), driving it over the same postMessage bridge the app uses. Usage: node scripts/test-reader.mjs book.epub
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
-const epubPath = resolve(process.argv[2] ?? 'book.epub');
+const bookPath = resolve(process.argv[2] ?? 'book.epub');
+const ext = bookPath.toLowerCase().split('.').pop();
+const bookUrl = `/book.${ext}`;
 const html = readFileSync(resolve('assets/reader/reader.html'));
-const epub = readFileSync(epubPath);
+const book = readFileSync(bookPath);
+const MIME = { epub: 'application/epub+zip', pdf: 'application/pdf', txt: 'text/plain' };
 
 const server = createServer((req, res) => {
-  if (req.url === '/book.epub') {
-    res.writeHead(200, { 'Content-Type': 'application/epub+zip' });
-    res.end(epub);
+  const extra = resolve('assets/reader', req.url.slice(1));
+  if (req.url === bookUrl) {
+    res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+    res.end(book);
+  } else if (/\.webjs$/.test(req.url) && existsSync(extra)) {
+    res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    res.end(readFileSync(extra));
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
@@ -42,7 +49,7 @@ const waitFor = async (type, timeout = 15000, pred = () => true) => {
     await new Promise((r) => setTimeout(r, 50));
   }
   throw new Error(
-    `timeout waiting for ${type}; got ${messages.map((m) => m.type + (m.message ? ':' + m.message : '')).join(',')}`,
+    `timeout waiting for ${type}; got ${messages.map((m) => m.type + (m.message ? ':' + m.message : '') + (m.stack ? '\n' + m.stack : '')).join(',')}`,
   );
 };
 const settle = (ms = 800) => new Promise((r) => setTimeout(r, ms));
@@ -66,11 +73,11 @@ const settings = {
   dark: false,
   forceColors: true,
 };
-await send({ type: 'open', url: '/book.epub', name: 'book.epub', position: null, settings, annotations: [] });
+await send({ type: 'open', url: bookUrl, name: `book.${ext}`, position: null, settings, annotations: [] });
 const errEarly = messages.find((m) => m.type === 'error');
 if (errEarly) console.log('page error:', errEarly.message);
 const loaded = await waitFor('loaded', 30000);
-console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections);
+console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '');
 const first = await waitFor('relocate');
 console.log('relocate:', first.cfi, first.fraction.toFixed(4), first.tocLabel);
 await settle();
@@ -83,7 +90,9 @@ await settle();
 messages.length = 0;
 
 // Jump to a TOC entry, then to a fraction.
-const chapter = loaded.toc.find((t) => t.href) ?? loaded.toc[0];
+// An entry from the middle of the book, so the jump is a real move away from the second page.
+const withHref = loaded.toc.filter((t) => t.href);
+const chapter = withHref[Math.floor(withHref.length / 2)] ?? loaded.toc[0];
 await send({ type: 'goTo', target: chapter.href });
 const r3 = await waitFor('relocate', 10000, (m) => m.cfi !== second.cfi);
 console.log('goTo', chapter.label, '→', r3.tocLabel, r3.cfi);
@@ -95,6 +104,9 @@ console.log('goToFraction 0.5 →', r4.fraction.toFixed(3), r4.tocLabel);
 await settle();
 messages.length = 0;
 
+let selection = null;
+if (loaded.fixed) console.log('fixed layout: no taps, selections, highlights or read-aloud to test');
+else {
 // foliate's paginator keeps its iframe in a closed shadow root, so reach the chapter document through
 // Playwright's frame list.
 const frame = page.frames().find((f) => f !== page.mainFrame());
@@ -149,7 +161,7 @@ const selectText = () => {
   return range.toString();
 };
 const sel = await frame.evaluate(selectText);
-const selection = await waitFor('selection');
+selection = await waitFor('selection');
 console.log(
   'selection:',
   JSON.stringify(sel),
@@ -218,6 +230,8 @@ console.log('tts next block:', block2.sentences.length, 'sentences');
 await send({ type: 'ttsStop' });
 messages.length = 0;
 
+}
+
 // Search the whole book, then jump to the first hit and clear.
 // READER_SEARCH overrides the term (default suits Pride and Prejudice); READER_DUMP=1 prints every hit's CFI.
 const term = process.env.READER_SEARCH ?? 'Netherfield';
@@ -246,11 +260,11 @@ messages.length = 0;
 // Re-open at the saved CFI and confirm we land on the same spot.
 await send({
   type: 'open',
-  url: '/book.epub',
-  name: 'book.epub',
+  url: bookUrl,
+  name: `book.${ext}`,
   position: { cfi: r4.cfi, fraction: r4.fraction },
   settings: { ...settings, flow: 'scrolled' },
-  annotations: [{ cfi: selection.cfi, color: '#60A5FA', style: 'underline' }],
+  annotations: selection ? [{ cfi: selection.cfi, color: '#60A5FA', style: 'underline' }] : [],
 });
 await waitFor('loaded', 30000);
 const r5 = await waitFor('relocate');

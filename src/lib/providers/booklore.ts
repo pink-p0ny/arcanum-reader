@@ -191,15 +191,14 @@ export const bookloreProvider: LibraryProvider = {
   },
 
   async updateProgress(bookId, _fileId, pos) {
+    const percentage = Math.round(pos.fraction * 100 * 100) / 100;
     await request<void>('/api/v1/books/progress', {
       method: 'POST',
       body: JSON.stringify({
         bookId,
-        epubProgress: {
-          cfi: pos.cfi ?? undefined,
-          href: pos.href ?? undefined,
-          percentage: Math.round(pos.fraction * 100 * 100) / 100,
-        },
+        ...(pos.page
+          ? { pdfProgress: { page: pos.page, percentage } }
+          : { epubProgress: { cfi: pos.cfi ?? undefined, href: pos.href ?? undefined, percentage } }),
       }),
     });
   },

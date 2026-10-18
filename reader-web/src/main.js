@@ -2,6 +2,7 @@
 // so CFIs for progress and highlights stay compatible with the server and the web UI.
 import '../foliate/view.js';
 import { Overlayer } from '../foliate/overlayer.js';
+import { makeTxt } from './txt.js';
 
 const post = (msg) => {
   const bridge = window.ReactNativeWebView;
@@ -48,14 +49,16 @@ async function open({ url, name, position, settings: s, annotations }) {
     applyHostColors(s);
     status('Opening…');
     const blob = await loadBytes(url);
-    const file = new File([blob], name || 'book.epub', { type: 'application/epub+zip' });
+    const fileName = name || 'book.epub';
+    const file = new File([blob], fileName, { type: mimeFor(fileName) });
 
     if (view) view.remove();
     view = document.createElement('foliate-view');
     document.body.append(view);
     wireView(view);
 
-    await view.open(file);
+    // foliate sniffs every format it knows; plain text has no signature, so it is picked by name.
+    await view.open(isTxt(file) ? await makeTxt(file) : file);
     applyRendererSettings(s);
 
     for (const a of annotations ?? []) annotationStyles.set(a.cfi, { color: a.color, style: a.style });
@@ -66,6 +69,8 @@ async function open({ url, name, position, settings: s, annotations }) {
       title: book.metadata?.title ?? '',
       toc: serializeToc(book.toc ?? []),
       sections: book.sections?.length ?? 0,
+      // Fixed layout (PDF): pages are images with a text layer; no highlights, no read-aloud.
+      fixed: !!view.isFixedLayout,
     });
 
     if (position?.cfi) await view.init({ lastLocation: position.cfi });
@@ -81,6 +86,18 @@ async function open({ url, name, position, settings: s, annotations }) {
     post({ type: 'error', message: e?.message ?? String(e), stack: e?.stack });
   }
 }
+
+const MIME = {
+  epub: 'application/epub+zip',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  fb2: 'application/x-fictionbook+xml',
+  mobi: 'application/x-mobipocket-ebook',
+  azw3: 'application/vnd.amazon.ebook',
+};
+const ext = (name) => (name ?? '').toLowerCase().split('.').pop();
+const mimeFor = (name) => MIME[ext(name)] ?? 'application/octet-stream';
+const isTxt = (file) => file.type === 'text/plain' || ['txt', 'text'].includes(ext(file.name));
 
 function serializeToc(items, depth = 0) {
   if (!items || depth > 6) return [];
@@ -273,6 +290,7 @@ function scheduleSelection(doc, index) {
       post({ type: 'deselect' });
       return;
     }
+    if (view?.isFixedLayout) return; // nothing to anchor a highlight to on a rendered page
     const cfi = view?.getCFI(index, range);
     if (!cfi) return;
     post({ type: 'selection', cfi, text, rect: rectFor(range), chapter: currentTocLabel });
@@ -290,6 +308,13 @@ function applyHostColors(s) {
 function applyRendererSettings(s) {
   const r = view?.renderer;
   if (!r) return;
+  if (view.isFixedLayout) {
+    // Rendered pages: fit one page on screen; the margins/fonts/columns below are for reflowable text.
+    r.setAttribute('zoom', s.flow === 'scrolled' ? 'fit-width' : 'fit-page');
+    // Dark themes invert the page like Apple Books does; sepia tints it.
+    view.style.filter = s.dark ? 'invert(1) hue-rotate(180deg)' : s.theme === 'sepia' ? 'sepia(.35)' : '';
+    return;
+  }
   r.setAttribute('flow', s.flow);
   r.setAttribute('gap', `${s.sideMargin}%`);
   r.setAttribute('margin', `${s.verticalMargin}px`);
@@ -362,6 +387,9 @@ function ttsClearHighlight() {
 
 async function ttsInit() {
   view.tts = null;
+  // foliate's sentence segmenter throws on an empty language; books that declare none get the device locale.
+  const doc = view.renderer.getContents()[0]?.doc;
+  if (doc && !doc.documentElement.lang) doc.documentElement.lang = navigator.language || 'en';
   await view.initTTS('sentence', ttsHighlight);
 }
 
@@ -414,12 +442,13 @@ async function ttsAdvance(hops = 0) {
 const ttsHandlers = {
   ttsStart: async () => {
     try {
+      if (view?.isFixedLayout) throw new Error('Read aloud is not available for PDFs yet');
       await ttsInit();
       const range = view.lastLocation?.range;
       const ssml = range ? view.tts.from(range) : view.tts.start();
       await ttsEmit(ssml);
     } catch (e) {
-      post({ type: 'error', message: `Read aloud failed: ${e?.message ?? e}` });
+      post({ type: 'error', message: `Read aloud failed: ${e?.message ?? e}`, stack: e?.stack });
     }
   },
   ttsNext: () =>
@@ -446,7 +475,19 @@ const handlers = {
   },
   next: () => view?.next(),
   prev: () => view?.prev(),
-  goTo: ({ target }) => view?.goTo(target).catch((e) => post({ type: 'error', message: e.message })),
+  // Like view.goTo, but waits for `resolveHref`: it is async for PDF links, which the vendored view.js
+  // does not await.
+  goTo: async ({ target }) => {
+    if (!view) return;
+    try {
+      const resolved = await view.resolveNavigation(target);
+      if (!resolved) throw new Error(`Could not resolve ${target}`);
+      await view.renderer.goTo(resolved);
+      view.history.pushState(target);
+    } catch (e) {
+      post({ type: 'error', message: e.message });
+    }
+  },
   goToFraction: ({ fraction }) => view?.goToFraction(fraction),
   deselect: () => view?.deselect(),
   addAnnotation: ({ cfi, color, style }) => {

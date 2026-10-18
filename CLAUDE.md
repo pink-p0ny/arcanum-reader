@@ -9,8 +9,24 @@
   change `reader-web/src/main.js` and rebuild with `npm run build:reader`. The bundle is inlined into
   `assets/reader/reader.html` by string splicing, never `String.replace` (foliate uses `$$` identifiers).
 - The WebView loads `reader.html` from the Documents directory so WKWebView lets it XHR the downloaded EPUB
-  (`allowingReadAccessToURL`). See `src/lib/reader-asset.ts`.
+  (`allowingReadAccessToURL`). See `src/lib/reader-asset.ts`, which also copies `pdfjs.webjs` and
+  `pdf.worker.webjs` next to it.
+- Formats: `src/lib/formats.ts` lists what the reader opens (EPUB, AZW3, MOBI, FB2, PDF, TXT). PDF goes through
+  `reader-web/src/pdf.js` (adapted from foliate-js) with pdfjs-dist pinned to 4.10.x: 5.x/6.x need WebKit
+  features (`Iterator` helpers) missing before iOS 18.4. `build-reader.mjs` turns the pdf.js ES modules into
+  classic scripts (`assets/reader/*.webjs`, Metro asset ext `webjs`) because WKWebView refuses module scripts
+  from file URLs; both run on the main thread (pdf.js uses its in-page worker when `pdfjsWorker` is global).
+  PDFs are fixed layout: pages rendered to canvas, no highlights or read-aloud, progress by page
+  (`pageFromCfi`, servers get `pdfProgress`). TXT (`reader-web/src/txt.js`) becomes a reflowable book with
+  chapters guessed from heading lines; servers have no TXT type, so it is a folder-library format only.
+- `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/TXT; `READER_SEARCH` sets the search term.
+  Reader errors before the book opens are shown on screen and stored in kv `lastReaderError`
+  (`sqlite3 <app>/Documents/SQLite/grimmory.db` on a simulator).
+- Edition grouping (`src/lib/editions.ts`): base title (subtitle after `:`/dash dropped), apostrophes ignored,
+  author name parts sorted ("Barr, Nevada" = "Nevada Barr"), a missing author or bare title joins the group
+  when the rest agree. `node scripts/grimmory.mjs dupes` lists what a server still shows as separate cards.
 - Run `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:reader -- <epub>` before calling work done.
+  A preview-channel `eas update` plus the simulator build is the way to check WebKit-specific behaviour.
 - The project is pinned to SDK 57 because that is what Expo Go in the App Store supports; do not bump to 58 until Expo Go does. Native tabs import from `expo-router/unstable-native-tabs` on this SDK. The dev machine has Xcode 16.1, so prefer Expo Go or EAS Build over local native builds.
 - `modules/webview-edit-menu` is a local Expo module (Swift) that inserts Highlight / Add Note into the system
   text-selection menu of WKWebView, Apple Books style. It is absent in Expo Go, where the reader falls back to

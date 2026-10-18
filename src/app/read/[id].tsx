@@ -22,7 +22,7 @@ import { TtsBar } from '@/components/reader/tts-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { getProvider } from '@/lib/provider';
-import { getBook, type LocalAnnotation } from '@/lib/db';
+import { getBook, kvSet, type LocalAnnotation } from '@/lib/db';
 import { downloadBook, downloadsStore, localBookFile } from '@/lib/downloads';
 import { pickReadableFile } from '@/lib/formats';
 import { readerPageUri } from '@/lib/reader-asset';
@@ -81,6 +81,10 @@ export default function ReadScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [chrome, setChrome] = useState(true);
   const [toc, setToc] = useState<TocItem[]>([]);
+  /** The page has opened the book; errors before that are load failures. */
+  const pageLoaded = useRef(false);
+  /** Fixed-layout book (PDF): rendered pages, so no read-aloud. */
+  const [fixed, setFixed] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState<SearchState | null>(null);
@@ -213,7 +217,9 @@ export default function ReadScreen() {
     (e: ReaderEvent) => {
       switch (e.type) {
         case 'loaded':
+          pageLoaded.current = true;
           setToc(e.toc);
+          setFixed(!!e.fixed);
           break;
         case 'relocate': {
           const next = {
@@ -271,9 +277,14 @@ export default function ReadScreen() {
           ]);
           break;
         case 'error':
-          console.warn('[reader]', e.message);
-          if (!loaded) setLoadError(e.message);
-          else if (/Could not read book file|not supported/i.test(e.message)) setLoadError(e.message);
+          console.warn('[reader]', e.message, e.stack ?? '');
+          if (!loaded || !pageLoaded.current) {
+            setLoadError(e.message);
+            // Kept for support: Settings can show it, and `sqlite3 grimmory.db` on a simulator reads it.
+            kvSet('lastReaderError', { message: e.message, stack: e.stack ?? null, at: new Date().toISOString() }).catch(
+              () => {},
+            );
+          } else if (/Could not read book file|not supported/i.test(e.message)) setLoadError(e.message);
           break;
       }
     },
@@ -432,7 +443,7 @@ export default function ReadScreen() {
               {loaded?.title ?? ''}
             </ThemedText>
             <View style={styles.barRight}>
-              {!ttsActive ? (
+              {!ttsActive && !fixed ? (
                 <Pressable onPress={() => tts.start()} hitSlop={10} style={styles.barButton}>
                   <ThemedText style={[styles.barAction, { color: fg }]}>Listen</ThemedText>
                 </Pressable>

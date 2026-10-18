@@ -1,9 +1,11 @@
 import { isOfflineError } from './api';
+import { cfiForPage, pageFromCfi, typeFromName } from './formats';
 import { getProvider } from './provider';
 import {
   deleteLocalAnnotation,
   getAllPendingAnnotations,
   getAnnotations,
+  getDownload,
   getLocalProgress,
   getUnsyncedProgress,
   insertLocalAnnotation,
@@ -23,12 +25,22 @@ export interface Position {
   cfi: string | null;
   href: string | null;
   fraction: number;
+  /** 1-based page, set when the file being read is a PDF (servers store PDF progress by page). */
+  page?: number;
 }
 
 async function pushProgress(bookId: number, fileId: number | null, pos: Position, updatedAt: number) {
   const provider = getProvider(bookId);
-  if (provider.capabilities.progress) await provider.updateProgress(bookId, fileId, pos);
+  if (provider.capabilities.progress) await provider.updateProgress(bookId, fileId, await withPage(bookId, pos));
   await markProgressSynced(bookId, updatedAt);
+}
+
+/** Adds the page number for PDFs, worked out from the file on disk and foliate's section CFI. */
+async function withPage(bookId: number, pos: Position): Promise<Position> {
+  const dl = await getDownload(bookId);
+  if (!dl || typeFromName(dl.path) !== 'PDF') return pos;
+  const page = pageFromCfi(pos.cfi);
+  return page ? { ...pos, page } : pos;
 }
 
 /** The active provider's annotation API, or null for backends that keep highlights on the device only. */
@@ -72,6 +84,15 @@ export async function resolveStartPosition(
       cfi: server.cfi ?? null,
       href: server.href ?? null,
       fraction: (server.percentage ?? 0) / 100,
+    };
+  }
+  const pdf = detail?.pdfProgress;
+  if (pdf?.page || pdf?.percentage != null) {
+    return {
+      cfi: pdf.page ? cfiForPage(pdf.page) : null,
+      href: null,
+      fraction: (pdf.percentage ?? 0) / 100,
+      page: pdf.page,
     };
   }
   return local ? { cfi: local.cfi, href: local.href, fraction: local.fraction } : null;

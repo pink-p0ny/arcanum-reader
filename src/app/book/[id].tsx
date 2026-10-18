@@ -205,8 +205,8 @@ export default function BookScreen() {
             </View>
           ) : (
             <ThemedText themeColor="textSecondary">
-              This book is {book.primaryFileType ?? 'in a format'}; the reader opens EPUB, MOBI, AZW3 and FB2.
-              PDF and comics are not supported yet.
+              This book is {book.primaryFileType ?? 'in a format'}; the reader opens EPUB, MOBI, AZW3, FB2,
+              PDF and plain text. Comics and audiobooks are not supported yet.
             </ThemedText>
           )}
 

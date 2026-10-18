@@ -25,6 +25,16 @@
             "CFBundleTypeName": "EPUB book",
             "LSHandlerRank": "Alternate",
             "LSItemContentTypes": ["org.idpf.epub-container"]
+          },
+          {
+            "CFBundleTypeName": "PDF document",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["com.adobe.pdf"]
+          },
+          {
+            "CFBundleTypeName": "Plain text",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["public.plain-text"]
           }
         ],
         "LSSupportsOpeningDocumentsInPlace": false

@@ -9,6 +9,7 @@ import { importEpubs, loadFolderMeta } from '@/lib/library-folder';
 import { syncLibrary } from '@/lib/library';
 import { loadLocalOnly, loadSession, localOnlyStore, sessionStore } from '@/lib/session';
 import { ensureHiddenGenresLoaded } from '@/lib/genres';
+import { READABLE_FILE } from '@/lib/formats';
 import { launchArg } from '@/lib/launch-args';
 import { loadSettings } from '@/lib/settings';
 import { flushPending } from '@/lib/sync';
@@ -52,11 +53,11 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [session]);
 
-  // "Open in Arcanum": an EPUB handed over by Files, Mail or Safari lands in the library folder.
+  // "Open in Arcanum": a book handed over by Files, Mail or Safari lands in the library folder.
   useEffect(() => {
     if (!booted) return;
     const handle = (url: string | null) => {
-      if (!url || !url.startsWith('file://') || !/\.(epub|mobi|azw3?|kf8|fb2|prc)$/i.test(url)) return;
+      if (!url || !url.startsWith('file://') || !READABLE_FILE.test(url)) return;
       importEpubs([url])
         .then(() => syncLibrary())
         .then(() => {

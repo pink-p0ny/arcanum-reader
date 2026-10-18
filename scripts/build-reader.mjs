@@ -8,22 +8,25 @@ import { rollup } from 'rollup';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const debug = !!process.env.READER_DEBUG;
 
-const stubPdf = {
-  // Grimmory's vendored foliate-js omits pdf.js; the app only opens EPUBs.
-  name: 'stub-pdf',
-  resolveId(id) {
-    return id === './pdf.js' ? '\0pdf-stub' : null;
+// Grimmory's vendored foliate-js omits pdf.js; `view.js` still dynamically imports it, which resolves to ours.
+const ourPdf = {
+  name: 'arcanum-pdf',
+  resolveId(id, importer) {
+    return id === './pdf.js' && importer?.includes('/foliate/') ? resolve(root, 'reader-web/src/pdf.js') : null;
   },
-  load(id) {
-    return id === '\0pdf-stub'
-      ? 'export const makePDF = () => { throw new Error("PDF is not supported in this app") }'
-      : null;
+};
+
+// `import css from './x.css'` yields the stylesheet as a string (pdf.js layer styles go into each page frame).
+const cssString = {
+  name: 'css-string',
+  transform(code, id) {
+    return id.endsWith('.css') ? { code: `export default ${JSON.stringify(code)};`, map: null } : null;
   },
 };
 
 const bundle = await rollup({
   input: resolve(root, 'reader-web/src/main.js'),
-  plugins: [stubPdf, ...(debug ? [] : [terser({ format: { comments: false } })])],
+  plugins: [ourPdf, cssString, ...(debug ? [] : [terser({ format: { comments: false } })])],
   onwarn(w, warn) {
     if (w.code === 'CIRCULAR_DEPENDENCY' || w.code === 'EVAL') return;
     warn(w);
@@ -45,3 +48,17 @@ const html = `${template.slice(0, at)}<script>${js}</script>${template.slice(at 
 mkdirSync(resolve(root, 'assets/reader'), { recursive: true });
 writeFileSync(resolve(root, 'assets/reader/reader.html'), html);
 console.log(`reader.html: ${(html.length / 1024).toFixed(0)} KB${debug ? ' (debug)' : ''}`);
+
+// pdf.js ships as ES modules; WKWebView cannot load those from a file URL, so each becomes a classic
+// script (both set their own globals: pdfjsLib and pdfjsWorker). They are copied next to reader.html on the
+// device and fetched only when a PDF opens. `.webjs` keeps Metro from treating them as app source.
+for (const [input, out] of [
+  ['pdfjs-dist/build/pdf.min.mjs', 'pdfjs.webjs'],
+  ['pdfjs-dist/build/pdf.worker.min.mjs', 'pdf.worker.webjs'],
+]) {
+  const b = await rollup({ input: resolve(root, 'node_modules', input), onwarn() {} });
+  const { output: o } = await b.generate({ format: 'iife', name: 'pdfjsModule' });
+  await b.close();
+  writeFileSync(resolve(root, 'assets/reader', out), o[0].code);
+  console.log(`${out}: ${(o[0].code.length / 1024).toFixed(0)} KB`);
+}

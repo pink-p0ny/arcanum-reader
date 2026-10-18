@@ -110,6 +110,14 @@ export interface AppBookDetail {
   coverUpdatedOn?: string;
   isPhysical?: boolean;
   epubProgress?: EpubProgress;
+  pdfProgress?: PdfProgress;
+}
+
+/** PDF position as the servers store it: a 1-based page plus the percentage. */
+export interface PdfProgress {
+  page?: number;
+  percentage?: number;
+  updatedAt?: string;
 }
 
 export interface AppBookProgressResponse {
@@ -178,5 +186,6 @@ export interface BookFileProgress {
 export interface UpdateProgressRequest {
   fileProgress?: BookFileProgress;
   epubProgress?: { cfi?: string; href?: string; percentage: number };
+  pdfProgress?: { page: number; percentage: number };
   dateFinished?: string;
 }

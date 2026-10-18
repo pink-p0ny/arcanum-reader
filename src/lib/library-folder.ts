@@ -145,7 +145,17 @@ function indexBook(file: File, id: number, previous: CachedMeta | undefined): Ca
   let meta: Omit<EpubMeta, 'cover'> = { title: name.replace(/\.[^.]+$/, ''), authors: [] };
   let coverUri = previous?.coverUri ?? null;
   try {
-    if (typeFromName(name) !== 'EPUB') throw new Error('metadata is only read from EPUB');
+    const type = typeFromName(name);
+    if (type === 'TXT') {
+      // Project Gutenberg texts open with "Title:" and "Author:" lines; anything else keeps the file name.
+      const head = new TextDecoder().decode(file.bytesSync().subarray(0, 4000));
+      const title = head.match(/^Title:\s*(.+)$/m)?.[1]?.trim();
+      const author = head.match(/^Author:\s*(.+)$/m)?.[1]?.trim();
+      const language = head.match(/^Language:\s*(.+)$/m)?.[1]?.trim();
+      meta = { title: title || meta.title, authors: author ? [author] : [], language };
+      return { name, size, firstSeen: previous?.firstSeen ?? new Date().toISOString(), meta, coverUri };
+    }
+    if (type !== 'EPUB') throw new Error('metadata is only read from EPUB');
     const parsed = parseEpubMeta(file.bytesSync());
     const { cover, ...rest } = parsed;
     meta = { ...rest, title: rest.title || meta.title };

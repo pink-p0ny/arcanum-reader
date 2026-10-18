@@ -15,6 +15,8 @@ import { BookCard } from '@/components/book-card';
 import { LargeTitle } from '@/components/large-title';
 import * as DocumentPicker from 'expo-document-picker';
 
+import { READABLE_FILE } from '@/lib/formats';
+
 import { binderyStore, ensureBinderyLoaded } from '@/lib/bindery';
 import { importEpubs } from '@/lib/library-folder';
 import { useStore } from '@/lib/store';
@@ -54,13 +56,15 @@ export default function LibraryScreen() {
         'application/epub+zip',
         'application/x-mobipocket-ebook',
         'application/vnd.amazon.ebook',
+        'application/pdf',
+        'text/plain',
         'public.item',
       ],
       multiple: true,
       copyToCacheDirectory: true,
     });
     if (res.canceled) return;
-    const uris = res.assets.filter((a) => /\.(epub|mobi|azw3?|kf8|fb2|prc)$/i.test(a.name)).map((a) => a.uri);
+    const uris = res.assets.filter((a) => READABLE_FILE.test(a.name)).map((a) => a.uri);
     if (!uris.length) return;
     await importEpubs(uris);
     await sync();

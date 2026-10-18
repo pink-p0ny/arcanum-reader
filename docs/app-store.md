@@ -25,7 +25,7 @@ ways. No server? Drop EPUBs into a folder in iCloud Drive and read them on every
 passes through anyone else's cloud.
 
 READING
-• EPUB, Kindle AZW3 and MOBI, and FB2
+• EPUB, Kindle AZW3 and MOBI, FB2, PDF and plain text
 • Paged or scrolling, one or two columns, with real control over margins, line spacing, fonts and width
 • Light, sepia and dark themes, or follow the system
 • Highlights in six colours and four styles, with notes, all synced to your server
@@ -90,7 +90,7 @@ in the system browser after a confirmation). Result: 4+.
 
 Arcanum Reader is a client for a self-hosted library server (Grimmory or Booklore, both open source). It
 also works with no server at all: on the sign-in screen tap "No server? Use a folder of books instead",
-then add EPUBs with Add Books on the Library tab or by opening an EPUB from Files. To review the server
+then add books with Add Books on the Library tab or by opening an EPUB, PDF or text file from Files. To review the server
 features, sign in with:
 
     Server:   https://grimmory.example.com

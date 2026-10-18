@@ -9,7 +9,7 @@ import type { Annotation } from '@/lib/types';
 
 export type ReaderEvent =
   | { type: 'ready' }
-  | { type: 'loaded'; title: string; toc: TocItem[]; sections: number }
+  | { type: 'loaded'; title: string; toc: TocItem[]; sections: number; fixed?: boolean }
   | {
       type: 'relocate';
       cfi: string | null;
@@ -46,7 +46,7 @@ export type ReaderEvent =
     }
   | { type: 'searchProgress'; id: number; progress: number }
   | { type: 'searchDone'; id: number }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; stack?: string };
 
 export interface TocItem {
   label: string;

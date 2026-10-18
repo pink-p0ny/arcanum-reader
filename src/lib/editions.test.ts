@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { collapseEditions, editionKey, siblingEditions } from './editions';
-import { pickReadableFile, typeFromName } from './formats';
+import { authorKey, collapseEditions, editionKey, siblingEditions } from './editions';
+import { cfiForPage, pageFromCfi, pickReadableFile, typeFromName } from './formats';
 import type { AppBookSummary } from './types';
 
 const b = (id: number, title: string, type: string, over: Partial<AppBookSummary> = {}): AppBookSummary => ({
@@ -16,14 +16,24 @@ const b = (id: number, title: string, type: string, over: Partial<AppBookSummary
 });
 
 describe('editionKey', () => {
-  it('ignores case, punctuation, bracketed notes and a leading article', () => {
+  it('ignores case, punctuation, bracketed notes, subtitles and a leading article', () => {
     assert.equal(
       editionKey({ title: 'The Hobbit: Or There & Back (Illustrated)', authors: ['J.R.R. Tolkien'] }),
-      'hobbit or there and back|j r r tolkien',
+      'hobbit|j r r tolkien',
     );
+    assert.equal(editionKey({ title: "Liar's Poker", authors: ['Michael Lewis'] }), 'liars poker|lewis michael');
+    assert.equal(editionKey({ title: 'Liars Poker', authors: ['Michael Lewis'] }), 'liars poker|lewis michael');
+    assert.equal(editionKey({ title: 'Waking Up: A Guide to Spirituality', authors: ['Sam Harris'] }), 'waking up|harris sam');
+    assert.equal(editionKey({ title: 'Hunting Season - Anna Pigeon 10', authors: [] }), 'hunting season|');
+    assert.equal(editionKey({ title: '', authors: [] }), '');
+  });
+
+  it('matches authors written last name first', () => {
+    assert.equal(authorKey(['Barr, Nevada']), authorKey(['Nevada Barr']));
+    assert.notEqual(authorKey(['Nevada Barr']), authorKey(['Sam Harris']));
     assert.equal(
       editionKey({ title: 'Pride and Prejudice', authors: ['Jane Austen'] }),
-      'pride and prejudice|jane austen',
+      'pride and prejudice|austen jane',
     );
   });
 });
@@ -54,6 +64,49 @@ describe('collapseEditions', () => {
     const out = collapseEditions([b(1, '', 'EPUB', { authors: [] }), b(2, '', 'EPUB', { authors: [] })]);
     assert.equal(out.length, 2);
   });
+
+  it('merges copies whose metadata differs in author order, apostrophes, subtitle or a missing author', () => {
+    const out = collapseEditions([
+      b(1, 'Borderline', 'EPUB', { authors: ['Nevada Barr'] }),
+      b(2, 'Borderline', 'PDF', { authors: ['Barr, Nevada'] }),
+      b(3, "Liar's Poker", 'EPUB', { authors: ['Michael Lewis'] }),
+      b(4, 'Liars Poker', 'PDF', { authors: ['Michael Lewis'] }),
+      b(5, 'Waking Up', 'EPUB', { authors: ['Sam Harris'] }),
+      b(6, 'Waking Up: A Guide to Spirituality Without Religion', 'PDF', { authors: ['Sam Harris'] }),
+      b(7, 'Burn', 'EPUB', { authors: ['Nevada Barr'] }),
+      b(8, 'Burn', 'PDF', { authors: [] }),
+    ]);
+    assert.deepEqual(
+      out.map((x) => [x.id, (x.editions ?? []).map((e) => e.id)]),
+      [
+        [1, [1, 2]],
+        [3, [3, 4]],
+        [5, [5, 6]],
+        [7, [7, 8]],
+      ],
+    );
+  });
+
+  it('keeps different books apart when only the base title matches', () => {
+    const out = collapseEditions([
+      b(1, 'Star Wars: A New Hope', 'EPUB', { authors: ['George Lucas'] }),
+      b(2, 'Star Wars: The Last Jedi', 'EPUB', { authors: ['Jason Fry'] }),
+      b(3, 'Star Wars: The Last Jedi', 'PDF', { authors: ['Jason Fry'] }),
+      b(4, 'Burn', 'EPUB', { authors: ['Nevada Barr'] }),
+      b(5, 'Burn', 'EPUB', { authors: ['James Patterson'] }),
+      b(6, 'Burn', 'PDF', { authors: [] }),
+    ]);
+    assert.deepEqual(
+      out.map((x) => [x.id, (x.editions ?? []).map((e) => e.id)]),
+      [
+        [1, []],
+        [2, [2, 3]],
+        [4, []],
+        [5, []],
+        [6, []],
+      ],
+    );
+  });
 });
 
 describe('siblingEditions', () => {
@@ -68,7 +121,9 @@ describe('formats', () => {
   it('maps file names to server types and picks the best readable file', () => {
     assert.equal(typeFromName('a.EPUB'), 'EPUB');
     assert.equal(typeFromName('a.azw'), 'AZW3');
-    assert.equal(typeFromName('a.pdf'), null);
+    assert.equal(typeFromName('a.pdf'), 'PDF');
+    assert.equal(typeFromName('notes.TXT'), 'TXT');
+    assert.equal(typeFromName('a.cbz'), null);
     const files = [
       {
         id: 1,
@@ -108,6 +163,15 @@ describe('formats', () => {
       type: 'MOBI',
       name: 'x.mobi',
     });
-    assert.equal(pickReadableFile([files[2]], { id: 3, type: 'PDF' }), null);
+    assert.deepEqual(pickReadableFile([files[2]], { id: 3, type: 'PDF' }), { id: 3, type: 'PDF', name: 'a.pdf' });
+    assert.equal(pickReadableFile(undefined, { id: 3, type: 'CBX' }), null);
+  });
+
+  it('maps PDF pages to foliate section CFIs and back', () => {
+    assert.equal(cfiForPage(1), 'epubcfi(/6/2)');
+    assert.equal(pageFromCfi('epubcfi(/6/24)'), 12);
+    assert.equal(pageFromCfi('epubcfi(/6/24!/4/2)'), 12);
+    assert.equal(pageFromCfi('epubcfi(/6/3)'), null);
+    assert.equal(pageFromCfi(null), null);
   });
 });

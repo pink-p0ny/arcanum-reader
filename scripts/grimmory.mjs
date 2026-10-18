@@ -9,7 +9,7 @@
 
 import readline from 'node:readline';
 
-import { editionKey } from '../src/lib/editions.ts';
+import { fileStem, groupEditions } from '../src/lib/editions.ts';
 
 const [cmd = 'dupes', serverArg, userArg] = process.argv.slice(2);
 
@@ -59,11 +59,12 @@ async function allBooks({ server, headers }) {
   return out;
 }
 
-/** Title words only, articles and punctuation gone: the loosest plausible "same book" key. */
+/** Title words only, articles and punctuation gone, or the file name stem: the loosest plausible "same book" key. */
 const looseKey = (b) =>
+  fileStem(b.primaryFileName) ??
   (b.title ?? '')
     .toLowerCase()
-    .replace(/[:–—-].*$/, ' ')
+    .replace(/[:\u2013\u2014-].*$/, ' ')
     .replace(/\(.*?\)|\[.*?\]/g, ' ')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
@@ -88,11 +89,13 @@ if (cmd === 'dump') {
     if (!k) continue;
     groups.set(k, [...(groups.get(k) ?? []), b]);
   }
+  // What the app does with them: one card per group.
+  const card = new Map();
+  groupEditions(books).forEach((g, i) => g.forEach((b) => card.set(b.id, i)));
   let shown = 0;
   for (const [k, g] of groups) {
     if (g.length < 2) continue;
-    // Already one card in the app when every strict key matches.
-    if (new Set(g.map(editionKey)).size === 1) continue;
+    if (new Set(g.map((b) => card.get(b.id))).size === 1) continue;
     shown++;
     console.log(`\n${k}`);
     for (const b of g) console.log(line(b));

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { authorKey, collapseEditions, editionKey, siblingEditions } from './editions';
+import { authorKey, collapseEditions, editionKey, readMetadata, siblingEditions } from './editions';
 import { cfiForPage, pageFromCfi, pickReadableFile, typeFromName } from './formats';
 import type { AppBookSummary } from './types';
 
@@ -19,7 +19,7 @@ describe('editionKey', () => {
   it('ignores case, punctuation, bracketed notes, subtitles and a leading article', () => {
     assert.equal(
       editionKey({ title: 'The Hobbit: Or There & Back (Illustrated)', authors: ['J.R.R. Tolkien'] }),
-      'hobbit|j r r tolkien',
+      'hobbit|j r tolkien',
     );
     assert.equal(editionKey({ title: "Liar's Poker", authors: ['Michael Lewis'] }), 'liars poker|lewis michael');
     assert.equal(editionKey({ title: 'Liars Poker', authors: ['Michael Lewis'] }), 'liars poker|lewis michael');
@@ -28,8 +28,9 @@ describe('editionKey', () => {
     assert.equal(editionKey({ title: '', authors: [] }), '');
   });
 
-  it('matches authors written last name first', () => {
+  it('matches authors written last name first or split into parts', () => {
     assert.equal(authorKey(['Barr, Nevada']), authorKey(['Nevada Barr']));
+    assert.equal(authorKey(['Penny', 'Louise']), authorKey(['Penny, Louise']));
     assert.notEqual(authorKey(['Nevada Barr']), authorKey(['Sam Harris']));
     assert.equal(
       editionKey({ title: 'Pride and Prejudice', authors: ['Jane Austen'] }),
@@ -83,6 +84,46 @@ describe('collapseEditions', () => {
         [3, [3, 4]],
         [5, [5, 6]],
         [7, [7, 8]],
+      ],
+    );
+  });
+
+  it('reads swapped title and author fields the right way round', () => {
+    assert.deepEqual(readMetadata({ title: 'Barr, Nevada', authors: ['Hunting Season (V1.0 Txt)'] }), {
+      title: 'Hunting Season (V1.0 Txt)',
+      authors: ['Barr, Nevada'],
+    });
+    assert.deepEqual(readMetadata({ title: 'Penny, Louise', authors: ['Louise Penny'] }), {
+      title: 'Penny, Louise',
+      authors: ['Louise Penny'],
+    });
+  });
+
+  it('merges the real cases from a Grimmory library', () => {
+    const f = (id: number, title: string, type: string, authors: string[], file: string) =>
+      b(id, title, type, { authors, primaryFileName: file });
+    const out = collapseEditions([
+      f(207, 'A Fatal Grace', 'PDF', ['Penny', 'Louise'], 'A Fatal Grace - Louise Penny.pdf'),
+      f(208, 'A Fatal Grace', 'EPUB', ['Penny, Louise'], 'A Fatal Grace - Louise Penny.epub'),
+      f(269, 'Barr, Nevada', 'EPUB', ['Liberty Falling (V1.0 Txt)'], 'Liberty Falling - Nevada Barr.epub'),
+      f(270, 'Liberty Falling', 'PDF', ['Barr', 'Nevada'], 'Liberty Falling - Nevada Barr.pdf'),
+      f(224, 'Barr, Nevada', 'EPUB', ['Hunting Season (V1.0 Txt)'], 'Hunting season - Nevada Barr.epub'),
+      f(225, 'Hunting Season', 'PDF', ['Barr', 'Nevada'], 'Hunting Season - Nevada Barr.pdf'),
+      f(184, "Liar's Poker (2010)", 'AZW3', ['Lewis, Michael'], "Liar's Poker - Michael Lewis.azw3"),
+      f(183, "Liar's Poker (2010)", 'PDF', ['Lewis', 'Michael'], "Liar's Poker - Michael Lewis.pdf"),
+      f(185, "Liar's Poker (2010)", 'EPUB', ['Lewis, Michael'], "Liar's Poker - Michael Lewis.epub"),
+      f(213, 'The Best American Mystery Stories 2018', 'EPUB', ['Louise Penny'], 'Best American Mystery Stories 2018 - Louise Penny.epub'),
+      f(211, 'The Best American Mystery Stories 2018', 'AZW3', ['Louise Penny'], 'Best American Mystery Stories 2018 - Louise Penny.azw3'),
+      f(212, 'The Best American Mystery Stories 2018 (The Best American Series ®)', 'MOBI', ['Penzler, Otto'], 'Best American Mystery Stories 2018 - Louise Penny.mobi'),
+    ]);
+    assert.deepEqual(
+      out.map((x) => [x.id, (x.editions ?? []).map((e) => e.id).sort()]),
+      [
+        [208, [207, 208]],
+        [269, [269, 270]],
+        [224, [224, 225]],
+        [185, [183, 184, 185]],
+        [213, [211, 212, 213]],
       ],
     );
   });

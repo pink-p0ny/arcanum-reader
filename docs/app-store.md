@@ -70,10 +70,11 @@ ebook,epub,mobi,reader,grimmory,booklore,self-hosted,library,highlights,notes,re
 ## Privacy policy (live at arcanum-reader.app/privacy.html; source in site/)
 
 Arcanum Reader does not collect, store or transmit any personal data to its developer. The app connects
-only to servers the user configures: a Grimmory or Booklore library server, optionally a Bindery server,
-and optionally the Anthropic API using the user's own key. Credentials are stored in the device keychain.
-Reading positions, highlights and notes are stored on the user's own library server. The app contains no
-analytics, advertising or tracking. Questions: <email>.
+only to servers and storage the user configures: a Grimmory or Booklore library server, the user's own
+iCloud Drive for a folder library, optionally a Bindery server, and optionally the Anthropic API using
+the user's own key. Credentials are stored in the device keychain. Reading positions, highlights and notes
+are stored on the user's own library server, or beside the book in their iCloud Drive. The app contains
+no analytics, advertising or tracking. Questions: support@arcanum-reader.app.
 
 ## App Privacy questionnaire
 

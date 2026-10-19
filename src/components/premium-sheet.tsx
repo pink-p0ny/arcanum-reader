@@ -10,6 +10,8 @@ import { useStore } from '@/lib/store';
 interface Props {
   visible: boolean;
   onClose: () => void;
+  /** Called after a purchase or restore made Arcanum Cloud active, before the sheet closes. */
+  onActivated?: () => void;
 }
 
 const ORDER: PremiumPackage['kind'][] = ['yearly', 'monthly', 'lifetime'];
@@ -30,15 +32,15 @@ const SUFFIX: Record<PremiumPackage['kind'], string> = {
 };
 
 /** The Arcanum Cloud paywall: three options, restore, and the legal links Apple requires. */
-export function PremiumSheet({ visible, onClose }: Props) {
+export function PremiumSheet({ visible, onClose, onActivated }: Props) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      {visible ? <Body onClose={onClose} /> : null}
+      {visible ? <Body onClose={onClose} onActivated={onActivated} /> : null}
     </Modal>
   );
 }
 
-function Body({ onClose }: { onClose: () => void }) {
+function Body({ onClose, onActivated }: { onClose: () => void; onActivated?: () => void }) {
   const theme = useTheme();
   const premium = useStore(premiumStore);
   const [busy, setBusy] = useState<string | null>(null);
@@ -50,7 +52,10 @@ function Body({ onClose }: { onClose: () => void }) {
   const buy = async (pkg: PremiumPackage) => {
     setBusy(pkg.id);
     try {
-      if (await purchase(pkg)) onClose();
+      if (await purchase(pkg)) {
+        onActivated?.();
+        onClose();
+      }
     } catch (e) {
       Alert.alert('Purchase failed', (e as Error).message);
     } finally {
@@ -66,7 +71,10 @@ function Body({ onClose }: { onClose: () => void }) {
         ok ? 'Restored' : 'Nothing to restore',
         ok ? 'Arcanum Cloud is active.' : 'No purchase found for this Apple ID.',
       );
-      if (ok) onClose();
+      if (ok) {
+        onActivated?.();
+        onClose();
+      }
     } catch (e) {
       Alert.alert('Restore failed', (e as Error).message);
     } finally {

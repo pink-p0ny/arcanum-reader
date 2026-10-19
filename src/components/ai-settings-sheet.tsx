@@ -221,7 +221,11 @@ function Body({ onClose }: { onClose: () => void }) {
           </>
         ) : null}
       </ScrollView>
-      <PremiumSheet visible={showPaywall} onClose={() => setShowPaywall(false)} />
+      <PremiumSheet
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onActivated={() => updateAiConfig({ mode: 'cloud' })}
+      />
     </View>
   );
 }

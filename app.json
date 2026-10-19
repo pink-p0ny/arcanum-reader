@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "isTabletOnly": true,
       "bundleIdentifier": "net.snobunny.arcanum",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

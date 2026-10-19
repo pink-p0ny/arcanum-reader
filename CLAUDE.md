@@ -71,3 +71,6 @@
   `extra.revenueCatIosKey`). `CLOUD_ENABLED` is `__DEV__` so Arcanum Cloud stays hidden in production until
   the hosted service exists. The folder library (`src/lib/library-folder.ts`) uses negative book ids;
   `getProvider(bookId)` routes them. iCloud needs the dev build (`modules/icloud-container`).
+- Planned work and bugs are tracked as GitHub issues on pink-p0ny/arcanum-reader (`gh issue list`): label `FR`
+  for feature requests, `BUG` for bugs, `chore` for release/upgrade tasks. File new ideas and device-reported
+  bugs there rather than in memory; reference the issue number in the commit that closes it.

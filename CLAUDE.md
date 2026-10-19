@@ -72,6 +72,12 @@
   the `preview`/`production` channels take JS over the air: `eas update --channel <c> --environment <c>
   --platform ios` (web is not installed, so never `--platform all`).
 - TestFlight builds predating `expo-updates` (build 3) cannot take OTA updates; build 4 onward can.
+- EAS Update code signing: `certs/certificate.pem` is the public certificate (CN Pink Pony Software LLC, valid
+  to 2036); the private key lives in `~/.arcanum/update-keys/` on the dev Mac, never in the repo. Not yet wired
+  in: builds 1–6 have no certificate, and Expo requires a new runtime version for it, so run
+  `npx expo-updates codesigning:configure --certificate-input-directory certs --key-input-directory ~/.arcanum/update-keys`
+  together with the version bump for build 7, and from then on pass `--private-key-path ~/.arcanum/update-keys/private-key.pem`
+  to every `eas update`.
 - Purchases go through RevenueCat (`src/lib/premium.ts`, entitlement `premium`, public key in app.json
   `extra.revenueCatIosKey`). `CLOUD_ENABLED` is `__DEV__` so Arcanum Cloud stays hidden in production until
   the hosted service exists. The folder library (`src/lib/library-folder.ts`) uses negative book ids;

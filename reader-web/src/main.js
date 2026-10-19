@@ -5,6 +5,22 @@ import { Overlayer } from '../foliate/overlayer.js';
 import { makePDF } from './pdf.js';
 import { makeTxt } from './txt.js';
 
+// Books are untrusted input. foliate sandboxes each section in an iframe but leaves `allow-scripts` on,
+// and because this page runs from a file URL with universal file access, a script inside a book would share
+// our origin and could read every file in the app's Documents folder. Scripts are never needed to read a
+// book, so strip the flag at the moment foliate sets the attribute, before the iframe navigates. Listeners
+// that foliate and this file attach from the parent still fire: only the section's own scripts are blocked.
+const setIframeAttribute = HTMLIFrameElement.prototype.setAttribute;
+HTMLIFrameElement.prototype.setAttribute = function (name, value) {
+  if (name === 'sandbox') {
+    value = String(value)
+      .split(/\s+/)
+      .filter((flag) => flag && flag !== 'allow-scripts')
+      .join(' ');
+  }
+  return setIframeAttribute.call(this, name, value);
+};
+
 const post = (msg) => {
   const bridge = window.ReactNativeWebView;
   if (bridge) bridge.postMessage(JSON.stringify(msg));

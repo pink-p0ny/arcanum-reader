@@ -274,6 +274,8 @@ export default function ReadScreen() {
           tts.onEnd();
           break;
         case 'externalLink':
+          // Only web and mail links leave the app; a book cannot trigger tel:, file: or other app schemes.
+          if (!/^(https?:|mailto:)/i.test(e.href)) break;
           Alert.alert('Open link?', e.href, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open', onPress: () => Linking.openURL(e.href) },

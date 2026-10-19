@@ -25,6 +25,10 @@
   `test:reader` use pages mode. TXT (`reader-web/src/txt.js`) becomes a reflowable book with
   chapters guessed from heading lines; servers have no TXT type, so it is a folder-library format only.
 - `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/TXT; `READER_SEARCH` sets the search term.
+  Books are untrusted: `reader-web/src/main.js` strips `allow-scripts` from every content iframe's sandbox
+  (foliate leaves it on), and the test fails if `reader-web/test/scripted.epub` (Alice with a script element,
+  an inline handler and a javascript: link injected) manages to set `data-script-ran`. The app only opens
+  http(s)/mailto links out of a book.
   Reader errors before the book opens are shown on screen and stored in kv `lastReaderError`
   (`sqlite3 <app>/Documents/SQLite/grimmory.db` on a simulator).
 - Edition grouping (`src/lib/editions.ts`): base title (subtitle after `:`/dash dropped), apostrophes ignored,

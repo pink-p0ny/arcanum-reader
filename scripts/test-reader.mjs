@@ -300,6 +300,17 @@ console.log('reopen at cfi → fraction', r5.fraction.toFixed(3), '(expected ~',
 // page (PDF) a section is a large share of the book, so allow a section's worth of drift.
 if (Math.abs(r5.fraction - r4.fraction) > Math.max(0.02, 1 / loaded.sections)) throw new Error('did not restore position');
 
+// Books are untrusted: nothing a section carries (script elements, inline handlers, javascript: links)
+// may run. reader-web/test/scripted.epub sets a marker through each of those routes.
+const scriptRan = await page.evaluate(() =>
+  document
+    .querySelector('foliate-view')
+    ?.renderer?.getContents?.()
+    .some((c) => c.doc?.documentElement.hasAttribute('data-script-ran')),
+);
+if (scriptRan) throw new Error('a script inside the book ran');
+console.log('book scripts blocked');
+
 const errors = messages.filter((m) => m.type === 'error');
 if (errors.length) console.log('errors:', errors);
 await page.screenshot({ path: resolve(process.env.READER_SCREENSHOT || 'reader-test.png') });

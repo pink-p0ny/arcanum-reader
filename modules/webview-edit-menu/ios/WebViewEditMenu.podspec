@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.summary        = 'Adds app actions to the WKWebView text-selection edit menu'
   s.description    = 'Local Expo module for Arcanum Reader.'
   s.author         = 'Arcanum'
-  s.homepage       = 'https://grimmory.example.com'
+  s.homepage       = 'https://arcanum-reader.app'
   s.license        = { :type => 'MIT' }
   s.platforms      = { :ios => '15.1' }
   s.source         = { :git => '' }

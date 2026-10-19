@@ -100,11 +100,12 @@ highlights sync to that server. Bindery and AI picks are optional integrations t
 own servers or API key; leave them unconfigured. Arcanum Cloud (the subscription) is not offered in this
 release.
 
-    Server:   https://grimmory.example.com
+    Server:   <server>
     Username: reviewer
 
-The demo password is not stored here: `scripts/asc.mjs review` reads it from `$DEMO_PASSWORD` or the
-clipboard and sends it to the App Review demo-account field. The account is a download-only Grimmory user
+The demo server URL and password are not stored here: `scripts/asc.mjs review` reads the URL from
+`$REVIEW_SERVER` and the password from `$DEMO_PASSWORD` or the clipboard, and sends them to the App Review
+notes and demo-account fields. The account is a download-only Grimmory user
 assigned to the "Review Library" only (library id 2, files under `/app/data/review-library`).
 
 ## Review contact

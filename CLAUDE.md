@@ -56,8 +56,8 @@
 - `scripts/asc.mjs` talks to the App Store Connect API with the key in `~/.appstoreconnect/private_keys/`
   (never in the repo): `inspect`, `products`, `equalize <subId>`, `screenshots <png>` (review screenshots
   for the products), `listing` (pushes docs/app-store.md: subtitle, categories, description, keywords,
-  URLs, age rating; rerun after editing the doc), `review` (App Review notes, demo account `reviewer` with the
-  password from `$DEMO_PASSWORD`/clipboard, contact from `REVIEW_CONTACT_*` env vars) and `storeshots <dir>` (replaces the 13-inch and 11-inch
+  URLs, age rating; rerun after editing the doc), `review` (App Review notes, demo account `reviewer` on the server in
+  `$REVIEW_SERVER`, password from `$DEMO_PASSWORD`/clipboard, contact from `REVIEW_CONTACT_*` env vars) and `storeshots <dir>` (replaces the 13-inch and 11-inch
   iPad screenshot sets from `13-*.png` / `11-*.png`). Products: group "Arcanum Premium" (display "Arcanum
   Cloud"), monthly/yearly subscriptions and a lifetime non-consumable.
 - Store screenshots: `scripts/screenshots.sh <simulator build id> <epub dir> <out dir>` installs the EAS

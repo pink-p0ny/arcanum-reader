@@ -671,7 +671,10 @@ export function parseReview(md) {
     return /^<.*>$/.test(v) ? '' : v;
   };
   const notes = section('Review notes');
-  const cred = (k) => notes.match(new RegExp(`^ {4}${k}:\\s*(\\S+)`, 'm'))?.[1] ?? '';
+  const cred = (k) => {
+    const v = notes.match(new RegExp(`^ {4}${k}:\\s*(\\S+)`, 'm'))?.[1] ?? '';
+    return /^<.*>$/.test(v) ? '' : v;
+  };
   return {
     // Everything before the credentials block, paragraphs joined; the block and the doc-only remarks after it are dropped.
     notes: notes
@@ -680,7 +683,7 @@ export function parseReview(md) {
       .split(/\n{2,}/)
       .map((p) => p.replace(/\n/g, ' '))
       .join('\n\n'),
-    server: cred('Server'),
+    server: process.env.REVIEW_SERVER || cred('Server'),
     username: cred('Username'),
     contactFirstName: process.env.REVIEW_CONTACT_FIRST || cell('First name'),
     contactLastName: process.env.REVIEW_CONTACT_LAST || cell('Last name'),
@@ -694,6 +697,7 @@ commands.review = async function review(versionString = '1.0.0') {
   const R = parseReview(readFileSync(LISTING_DOC, 'utf8'));
   const password = (process.env.DEMO_PASSWORD || execFileSync('pbpaste', { encoding: 'utf8' })).trim();
   if (!R.username || !password) throw new Error('need the demo username in the doc and its password in $DEMO_PASSWORD or the clipboard');
+  if (!R.server) throw new Error('set REVIEW_SERVER to the demo server URL (not kept in the repo)');
   const notes = `${R.notes}\n\nServer: ${R.server}`;
   if (notes.length > 4000) throw new Error(`notes are ${notes.length} chars, limit 4000`);
   const app = await appId();

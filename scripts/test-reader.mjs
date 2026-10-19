@@ -302,11 +302,7 @@ if (Math.abs(r5.fraction - r4.fraction) > Math.max(0.02, 1 / loaded.sections)) t
 
 const errors = messages.filter((m) => m.type === 'error');
 if (errors.length) console.log('errors:', errors);
-await page.screenshot({
-  path: resolve(
-    'reader-test.png',
-  ),
-});
+await page.screenshot({ path: resolve(process.env.READER_SCREENSHOT || 'reader-test.png') });
 await browser.close();
 server.close();
 console.log(errors.length ? 'DONE WITH ERRORS' : 'OK');

@@ -490,7 +490,7 @@ export function parseListing(md) {
 
 const CATEGORY_IDS = { Books: 'BOOKS', Productivity: 'PRODUCTIVITY', Education: 'EDUCATION', Utilities: 'UTILITIES' };
 
-commands.listing = async function listing(versionString = '1.0') {
+commands.listing = async function listing(versionString = '1.0.0') {
   const L = parseListing(readFileSync(LISTING_DOC, 'utf8'));
   const limits = { name: 30, subtitle: 30, promotionalText: 170, description: 4000, keywords: 100 };
   for (const [k, max] of Object.entries(limits))
@@ -594,7 +594,7 @@ commands.listing = async function listing(versionString = '1.0') {
  */
 const SHOT_TYPES = { 13: 'APP_IPAD_PRO_3GEN_129', 11: 'APP_IPAD_PRO_3GEN_11' };
 
-commands.storeshots = async function storeshots(dir, versionString = '1.0') {
+commands.storeshots = async function storeshots(dir, versionString = '1.0.0') {
   const { readFileSync, readdirSync } = await import('node:fs');
   const { createHash } = await import('node:crypto');
   const { join } = await import('node:path');
@@ -690,7 +690,7 @@ export function parseReview(md) {
 }
 
 /** Pushes review notes, the demo account (password from $DEMO_PASSWORD or the clipboard) and contact details. */
-commands.review = async function review(versionString = '1.0') {
+commands.review = async function review(versionString = '1.0.0') {
   const R = parseReview(readFileSync(LISTING_DOC, 'utf8'));
   const password = (process.env.DEMO_PASSWORD || execFileSync('pbpaste', { encoding: 'utf8' })).trim();
   if (!R.username || !password) throw new Error('need the demo username in the doc and its password in $DEMO_PASSWORD or the clipboard');

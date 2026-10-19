@@ -682,10 +682,10 @@ export function parseReview(md) {
       .join('\n\n'),
     server: cred('Server'),
     username: cred('Username'),
-    contactFirstName: cell('First name'),
-    contactLastName: cell('Last name'),
-    contactPhone: cell('Phone'),
-    contactEmail: cell('Email'),
+    contactFirstName: process.env.REVIEW_CONTACT_FIRST || cell('First name'),
+    contactLastName: process.env.REVIEW_CONTACT_LAST || cell('Last name'),
+    contactPhone: process.env.REVIEW_CONTACT_PHONE || cell('Phone'),
+    contactEmail: process.env.REVIEW_CONTACT_EMAIL || cell('Email'),
   };
 }
 
@@ -714,7 +714,7 @@ commands.review = async function review(versionString = '1.0.0') {
     });
   const missing = ['contactFirstName', 'contactLastName', 'contactPhone', 'contactEmail'].filter((k) => !R[k]);
   console.log(`review details set for ${versionString}: demo account ${R.username}, notes ${notes.length} chars`);
-  if (missing.length) console.log(`contact fields still empty in docs/app-store.md: ${missing.join(', ')}`);
+  if (missing.length) console.log(`contact fields not set (REVIEW_CONTACT_* env or the doc table): ${missing.join(', ')}`);
 };
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;

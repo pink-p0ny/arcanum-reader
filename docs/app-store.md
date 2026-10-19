@@ -109,7 +109,9 @@ assigned to the "Review Library" only (library id 2, files under `/app/data/revi
 
 ## Review contact
 
-Pushed to the App Review contact fields by `scripts/asc.mjs review`. Fill in before submitting.
+Pushed to the App Review contact fields by `scripts/asc.mjs review`. The repo is public, so the real values
+are not kept here: set `REVIEW_CONTACT_FIRST`, `REVIEW_CONTACT_LAST`, `REVIEW_CONTACT_PHONE` and
+`REVIEW_CONTACT_EMAIL` in the environment when running the command (they override the table).
 
 | First name | <first> |
 | Last name | <last> |

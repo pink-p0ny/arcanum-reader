@@ -90,16 +90,30 @@ in the system browser after a confirmation). Result: 4+.
 
 Arcanum Reader is a client for a self-hosted library server (Grimmory or Booklore, both open source). It
 also works with no server at all: on the sign-in screen tap "No server? Use a folder of books instead",
-then add books with Add Books on the Library tab or by opening an EPUB, PDF or text file from Files. To review the server
-features, sign in with:
+then add books with Add Books on the Library tab or by opening an EPUB, PDF or text file from Files.
+
+To review the server features, sign in with the demo account below. It sees a "Review Library" of eight
+public-domain titles (Austen, Carroll, Conan Doyle, Gilman, Melville, Shelley, Stoker, Wilde) on the
+developer's own server and can read, download, highlight and annotate them; reading positions and
+highlights sync to that server. Bindery and AI picks are optional integrations that need the reviewer's
+own servers or API key; leave them unconfigured. Arcanum Cloud (the subscription) is not offered in this
+release.
 
     Server:   https://grimmory.example.com
-    Username: <create a reviewer account in Grimmory>
-    Password: <...>
+    Username: reviewer
 
-The library contains public-domain books. All features work with this account. Bindery and AI picks are
-optional integrations that need the user's own servers or API key; leave them unconfigured. Arcanum Cloud
-(the subscription) is not offered in this release.
+The demo password is not stored here: `scripts/asc.mjs review` reads it from `$DEMO_PASSWORD` or the
+clipboard and sends it to the App Review demo-account field. The account is a download-only Grimmory user
+assigned to the "Review Library" only (library id 2, files under `/app/data/review-library`).
+
+## Review contact
+
+Pushed to the App Review contact fields by `scripts/asc.mjs review`. Fill in before submitting.
+
+| First name | <first> |
+| Last name | <last> |
+| Phone | <phone> |
+| Email | <email> |
 
 ## Screenshots to take (iPad 13-inch and 11-inch)
 

@@ -1,6 +1,7 @@
 // App Store Connect API client and the chores we automate with it. No dependencies: the JWT is signed with
 // Node's crypto. Credentials live outside the repo in ~/.appstoreconnect/private_keys/ (AuthKey_<KEY>.p8
 // and issuer_<KEY>.txt). Usage: node scripts/asc.mjs <command> [args]
+import { execFileSync } from 'node:child_process';
 import { createSign, sign as cryptoSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -660,6 +661,60 @@ commands.storeshots = async function storeshots(dir, versionString = '1.0') {
     });
   }
   console.log('done');
+};
+
+/** Review notes, demo account and contact from docs/app-store.md ("Review notes" / "Review contact"). */
+export function parseReview(md) {
+  const section = (title) => md.match(new RegExp(`^## ${title}[^\\n]*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm'))?.[1].trim() ?? '';
+  const cell = (field) => {
+    const v = md.match(new RegExp(`^\\| ${field} \\| ([^|]+) \\|`, 'm'))?.[1].trim() ?? '';
+    return /^<.*>$/.test(v) ? '' : v;
+  };
+  const notes = section('Review notes');
+  const cred = (k) => notes.match(new RegExp(`^ {4}${k}:\\s*(\\S+)`, 'm'))?.[1] ?? '';
+  return {
+    // Everything before the credentials block, paragraphs joined; the block and the doc-only remarks after it are dropped.
+    notes: notes
+      .split(/\n {4}Server:/)[0]
+      .trim()
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\n/g, ' '))
+      .join('\n\n'),
+    server: cred('Server'),
+    username: cred('Username'),
+    contactFirstName: cell('First name'),
+    contactLastName: cell('Last name'),
+    contactPhone: cell('Phone'),
+    contactEmail: cell('Email'),
+  };
+}
+
+/** Pushes review notes, the demo account (password from $DEMO_PASSWORD or the clipboard) and contact details. */
+commands.review = async function review(versionString = '1.0') {
+  const R = parseReview(readFileSync(LISTING_DOC, 'utf8'));
+  const password = (process.env.DEMO_PASSWORD || execFileSync('pbpaste', { encoding: 'utf8' })).trim();
+  if (!R.username || !password) throw new Error('need the demo username in the doc and its password in $DEMO_PASSWORD or the clipboard');
+  const notes = `${R.notes}\n\nServer: ${R.server}`;
+  if (notes.length > 4000) throw new Error(`notes are ${notes.length} chars, limit 4000`);
+  const app = await appId();
+  const version = (await all(`/v1/apps/${app}/appStoreVersions?filter[platform]=IOS`)).find(
+    (v) => v.attributes.versionString === versionString,
+  );
+  if (!version) throw new Error(`no App Store version ${versionString}`);
+  const attributes = { demoAccountName: R.username, demoAccountPassword: password, demoAccountRequired: true, notes };
+  for (const k of ['contactFirstName', 'contactLastName', 'contactPhone', 'contactEmail']) if (R[k]) attributes[k] = R[k];
+  const existing = await api('GET', `/v1/appStoreVersions/${version.id}/appStoreReviewDetail`).catch(() => null);
+  if (existing?.data?.id)
+    await api('PATCH', `/v1/appStoreReviewDetails/${existing.data.id}`, {
+      data: { type: 'appStoreReviewDetails', id: existing.data.id, attributes },
+    });
+  else
+    await api('POST', '/v1/appStoreReviewDetails', {
+      data: { type: 'appStoreReviewDetails', attributes, relationships: { appStoreVersion: rel('appStoreVersions', version.id) } },
+    });
+  const missing = ['contactFirstName', 'contactLastName', 'contactPhone', 'contactEmail'].filter((k) => !R[k]);
+  console.log(`review details set for ${versionString}: demo account ${R.username}, notes ${notes.length} chars`);
+  if (missing.length) console.log(`contact fields still empty in docs/app-store.md: ${missing.join(', ')}`);
 };
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;

@@ -93,6 +93,18 @@ export function ensurePremiumLoaded(): Promise<void> {
 
 export const isPremium = () => premiumStore.get().active;
 
+/** RevenueCat's anonymous app user id: the only identity Arcanum Cloud ever sees. Null outside store builds. */
+export async function subscriberId(): Promise<string | null> {
+  await ensurePremiumLoaded();
+  const Purchases = loadSdk();
+  if (!Purchases || !premiumStore.get().available) return null;
+  try {
+    return await Purchases.getAppUserID();
+  } catch {
+    return null;
+  }
+}
+
 /** Resolves true when the entitlement is active afterwards, false when the user cancelled. */
 export async function purchase(pkg: PremiumPackage): Promise<boolean> {
   const Purchases = loadSdk();

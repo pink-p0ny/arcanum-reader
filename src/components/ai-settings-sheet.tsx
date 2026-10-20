@@ -8,11 +8,15 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   AI_MODELS,
   aiStore,
+  cloudStatus,
   ensureAiLoaded,
   setAiKey,
+  setSelfHosted,
   testAiKey,
+  testSelfHosted,
   updateAiConfig,
   type AiMode,
+  type ServerStatus,
 } from '@/lib/ai';
 import { CLOUD_ENABLED, ensurePremiumLoaded, premiumStore } from '@/lib/premium';
 import { useStore } from '@/lib/store';
@@ -22,7 +26,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** How AI features run: off, Arcanum Cloud (subscription), or the reader's own Anthropic key. */
+/** How AI features run: off, Arcanum Cloud (subscription), the reader's own Anthropic key, or their own server. */
 export function AiSettingsSheet({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -39,33 +43,45 @@ function Label({ children }: { children: string }) {
   );
 }
 
+type Status = { kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string };
+
+const quotaLine = (s: ServerStatus) =>
+  `${s.quota.used} of ${s.quota.limit} picks used today; resets at midnight UTC.`;
+
 function Body({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
   const ai = useStore(aiStore);
   const premium = useStore(premiumStore);
   const [key, setKey] = useState('');
+  const [selfUrl, setSelfUrl] = useState('');
+  const [selfToken, setSelfToken] = useState('');
   const [showPaywall, setShowPaywall] = useState(false);
-  const [status, setStatus] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string }>({
-    kind: 'idle',
-  });
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [cloud, setCloud] = useState<ServerStatus | null>(null);
 
   useEffect(() => {
-    ensureAiLoaded();
+    ensureAiLoaded().then(() => setSelfUrl((u) => u || aiStore.get().selfUrl));
     if (CLOUD_ENABLED) ensurePremiumLoaded();
   }, []);
 
+  useEffect(() => {
+    if (ai.mode !== 'cloud' || !premium.active) return;
+    let live = true;
+    cloudStatus()
+      .then((s) => live && setCloud(s))
+      .catch((e: Error) => live && setStatus({ kind: 'error', text: e.message }));
+    return () => {
+      live = false;
+    };
+  }, [ai.mode, premium.active]);
+
   const modes: { id: AiMode; label: string; hint: string }[] = [
-    { id: 'off', label: 'Off', hint: 'Surprise Me uses the on-device scorer' },
+    { id: 'off', label: 'Off', hint: 'On-device scorer' },
     ...(CLOUD_ENABLED
-      ? [
-          {
-            id: 'cloud' as AiMode,
-            label: 'Arcanum Cloud',
-            hint: premium.active ? 'Subscribed' : 'Subscription',
-          },
-        ]
+      ? [{ id: 'cloud' as AiMode, label: 'Arcanum Cloud', hint: premium.active ? 'Subscribed' : 'Subscription' }]
       : []),
-    { id: 'byok', label: 'Own API key', hint: 'Free, billed to your Anthropic account' },
+    { id: 'byok', label: 'Own API key', hint: 'Your Anthropic account' },
+    { id: 'self', label: 'Self-hosted', hint: 'Your Arcanum Server' },
   ];
 
   const choose = (mode: AiMode) => {
@@ -73,10 +89,11 @@ function Body({ onClose }: { onClose: () => void }) {
       setShowPaywall(true);
       return;
     }
+    setStatus({ kind: 'idle' });
     updateAiConfig({ mode });
   };
 
-  const save = async () => {
+  const saveKey = async () => {
     if (!key.trim()) return;
     setStatus({ kind: 'busy' });
     try {
@@ -89,10 +106,28 @@ function Body({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const forget = async () => {
-    await setAiKey(null);
+  const saveSelf = async () => {
+    if (!selfUrl.trim() || !selfToken.trim()) return;
+    setStatus({ kind: 'busy' });
+    try {
+      const info = await testSelfHosted(selfUrl, selfToken);
+      await setSelfHosted(selfUrl, selfToken);
+      setSelfToken('');
+      setStatus({ kind: 'ok', text: `Connected. ${quotaLine(info)}` });
+    } catch (e) {
+      setStatus({ kind: 'error', text: (e as Error).message });
+    }
+  };
+
+  const forgetSelf = async () => {
+    await setSelfHosted('', null);
+    setSelfUrl('');
     setStatus({ kind: 'idle' });
   };
+
+  const pill = (active: boolean) => [styles.pill, { backgroundColor: theme.backgroundElement }, active && styles.pillActive];
+  const pillText = (active: boolean) => ({ color: active ? '#fff' : theme.text, fontWeight: '600' as const });
+  const pillHint = (active: boolean) => ({ color: active ? '#ffffffcc' : theme.textSecondary });
 
   return (
     <View style={[styles.sheet, { backgroundColor: theme.background }]}>
@@ -112,70 +147,46 @@ function Body({ onClose }: { onClose: () => void }) {
         <Label>RUNS ON</Label>
         <View style={styles.pills}>
           {modes.map((m) => (
-            <Pressable
-              key={m.id}
-              onPress={() => choose(m.id)}
-              style={[
-                styles.pill,
-                { backgroundColor: theme.backgroundElement },
-                ai.mode === m.id && styles.pillActive,
-              ]}
-            >
-              <ThemedText style={{ color: ai.mode === m.id ? '#fff' : theme.text, fontWeight: '600' }}>
-                {m.label}
-              </ThemedText>
-              <ThemedText
-                type="small"
-                style={{ color: ai.mode === m.id ? '#ffffffcc' : theme.textSecondary }}
-              >
+            <Pressable key={m.id} onPress={() => choose(m.id)} style={pill(ai.mode === m.id)}>
+              <ThemedText style={pillText(ai.mode === m.id)}>{m.label}</ThemedText>
+              <ThemedText type="small" style={pillHint(ai.mode === m.id)}>
                 {m.hint}
               </ThemedText>
             </Pressable>
           ))}
         </View>
 
+        {ai.mode !== 'off' ? (
+          <>
+            <Label>MODEL</Label>
+            <View style={styles.pills}>
+              {AI_MODELS.map((m) => (
+                <Pressable key={m.id} onPress={() => updateAiConfig({ model: m.id })} style={pill(ai.model === m.id)}>
+                  <ThemedText style={pillText(ai.model === m.id)}>{m.label}</ThemedText>
+                  <ThemedText type="small" style={pillHint(ai.model === m.id)}>
+                    {m.hint}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+
         {ai.mode === 'cloud' ? (
           <>
             <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
               {premium.active
-                ? 'Arcanum Cloud is active on this Apple ID. The service itself is still being built; until it is live, Surprise Me falls back to the on-device scorer.'
+                ? `Arcanum Cloud is active on this Apple ID.${cloud && ai.mode === 'cloud' ? ` ${quotaLine(cloud)}` : ''}`
                 : 'Arcanum Cloud needs a subscription.'}
             </ThemedText>
             <Pressable onPress={() => setShowPaywall(true)} hitSlop={8} style={styles.inlineLink}>
-              <ThemedText style={styles.link}>
-                {premium.active ? 'Manage subscription' : 'Subscribe'}
-              </ThemedText>
+              <ThemedText style={styles.link}>{premium.active ? 'Manage subscription' : 'Subscribe'}</ThemedText>
             </Pressable>
           </>
         ) : null}
 
         {ai.mode === 'byok' ? (
           <>
-            <Label>MODEL</Label>
-            <View style={styles.pills}>
-              {AI_MODELS.map((m) => (
-                <Pressable
-                  key={m.id}
-                  onPress={() => updateAiConfig({ model: m.id })}
-                  style={[
-                    styles.pill,
-                    { backgroundColor: theme.backgroundElement },
-                    ai.model === m.id && styles.pillActive,
-                  ]}
-                >
-                  <ThemedText style={{ color: ai.model === m.id ? '#fff' : theme.text, fontWeight: '600' }}>
-                    {m.label}
-                  </ThemedText>
-                  <ThemedText
-                    type="small"
-                    style={{ color: ai.model === m.id ? '#ffffffcc' : theme.textSecondary }}
-                  >
-                    {m.hint}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-
             <Label>{`API KEY${ai.hasKey ? ' · SAVED' : ''}`}</Label>
             <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
               <TextInput
@@ -192,33 +203,78 @@ function Body({ onClose }: { onClose: () => void }) {
             </View>
             <View style={styles.actions}>
               <Pressable
-                onPress={save}
+                onPress={saveKey}
                 disabled={!key.trim() || status.kind === 'busy'}
                 style={[styles.primary, (!key.trim() || status.kind === 'busy') && styles.disabled]}
               >
-                <ThemedText style={styles.primaryText}>
-                  {status.kind === 'busy' ? 'Checking…' : 'Test and Save'}
-                </ThemedText>
+                <ThemedText style={styles.primaryText}>{status.kind === 'busy' ? 'Checking…' : 'Test and Save'}</ThemedText>
               </Pressable>
               {ai.hasKey ? (
-                <Pressable onPress={forget} hitSlop={8} style={styles.forget}>
+                <Pressable onPress={() => setAiKey(null).then(() => setStatus({ kind: 'idle' }))} hitSlop={8} style={styles.forget}>
                   <ThemedText style={{ color: '#d33' }}>Forget Key</ThemedText>
                 </Pressable>
               ) : null}
             </View>
-            {status.text ? (
-              <ThemedText
-                type="small"
-                style={[styles.status, { color: status.kind === 'error' ? '#d33' : theme.textSecondary }]}
-              >
-                {status.text}
-              </ThemedText>
-            ) : null}
             <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
               Keys are created at console.anthropic.com and billed to your own account. The key is stored in
               the iOS keychain and used only for these requests.
             </ThemedText>
           </>
+        ) : null}
+
+        {ai.mode === 'self' ? (
+          <>
+            <Label>{`SERVER${ai.hasSelfToken && ai.selfUrl ? ' · CONNECTED' : ''}`}</Label>
+            <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+              <TextInput
+                value={selfUrl}
+                onChangeText={setSelfUrl}
+                placeholder="https://ai.example.org"
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={[styles.input, { color: theme.text }]}
+                editable={status.kind !== 'busy'}
+              />
+              <View style={[styles.divider, { backgroundColor: theme.background }]} />
+              <TextInput
+                value={selfToken}
+                onChangeText={setSelfToken}
+                placeholder={ai.hasSelfToken ? 'Paste a new access token to replace it' : 'Access token'}
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                style={[styles.input, { color: theme.text }]}
+                editable={status.kind !== 'busy'}
+              />
+            </View>
+            <View style={styles.actions}>
+              <Pressable
+                onPress={saveSelf}
+                disabled={!selfUrl.trim() || !selfToken.trim() || status.kind === 'busy'}
+                style={[styles.primary, (!selfUrl.trim() || !selfToken.trim() || status.kind === 'busy') && styles.disabled]}
+              >
+                <ThemedText style={styles.primaryText}>{status.kind === 'busy' ? 'Checking…' : 'Test and Save'}</ThemedText>
+              </Pressable>
+              {ai.hasSelfToken ? (
+                <Pressable onPress={forgetSelf} hitSlop={8} style={styles.forget}>
+                  <ThemedText style={{ color: '#d33' }}>Forget Server</ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+              Run Arcanum Server on your own machine with your own provider key (github.com/pink-p0ny/arcanum-server)
+              and paste its ACCESS_TOKEN here. The token is stored in the iOS keychain.
+            </ThemedText>
+          </>
+        ) : null}
+
+        {status.text ? (
+          <ThemedText type="small" style={[styles.status, { color: status.kind === 'error' ? '#d33' : theme.textSecondary }]}>
+            {status.text}
+          </ThemedText>
         ) : null}
       </ScrollView>
       <PremiumSheet
@@ -243,6 +299,7 @@ const styles = StyleSheet.create({
   inlineLink: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
   body: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.two },
   card: { borderRadius: 12, paddingHorizontal: Spacing.three },
+  divider: { height: StyleSheet.hairlineWidth },
   hint: { paddingHorizontal: Spacing.one, marginBottom: Spacing.two },
   label: { letterSpacing: 0.6, marginTop: Spacing.two, paddingHorizontal: Spacing.one },
   pills: { flexDirection: 'row', gap: Spacing.two },

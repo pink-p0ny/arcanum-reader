@@ -101,14 +101,19 @@ export default function SettingsScreen() {
     ensureBinderyLoaded();
   }, []);
   const binderyConnected = !!bindery.url && bindery.hasKey;
+  const modelLabel = AI_MODELS.find((m) => m.id === ai.model)?.label ?? ai.model;
   const aiSummary =
     ai.mode === 'cloud'
-      ? 'Arcanum Cloud'
+      ? `Arcanum Cloud · ${modelLabel}`
       : ai.mode === 'byok'
         ? ai.hasKey
-          ? `Own key · ${AI_MODELS.find((m) => m.id === ai.model)?.label ?? ai.model}`
+          ? `Own key · ${modelLabel}`
           : 'Own key · not set'
-        : 'Off';
+        : ai.mode === 'self'
+          ? ai.selfUrl && ai.hasSelfToken
+            ? `Self-hosted · ${modelLabel}`
+            : 'Self-hosted · not set'
+          : 'Off';
   const { sync, syncing } = useLibrarySync();
   const qc = useQueryClient();
   const downloads = useQuery({

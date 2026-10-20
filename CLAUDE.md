@@ -51,8 +51,12 @@
 - Bindery client is `src/lib/bindery.ts` (API reference: raw.githubusercontent.com/vavallee/bindery/main/docs/API.md).
   Auth is `X-Api-Key`; `POST /api/v1/author/book` adds+searches with an admin key, 403 for requester keys
   falls back to `POST /api/v1/requests`. The server URL lives in kv, the key in SecureStore.
-- AI picks (`src/lib/ai.ts`) call the Anthropic Messages API from the device with the user's own key
-  (SecureStore) and a forced `pick_book` tool. Only candidate titles and a taste summary are sent.
+- AI picks (`src/lib/ai.ts`, pure parts in `ai-core.ts`) speak the Anthropic Messages API in four modes that
+  differ only by base URL and credential: `byok` (user's key, api.anthropic.com), `cloud` (hosted Arcanum
+  Server at cloud.arcanum-reader.app, bearer = RevenueCat app user id from `subscriberId()`), `self` (user's
+  own Arcanum Server, URL in kv, ACCESS_TOKEN in SecureStore) and `off`. Only candidate titles and a taste
+  summary are sent. The server lives in ../arcanum-server (github.com/pink-p0ny/arcanum-server): Hono,
+  Cloudflare Workers for the hosted copy, `npm start` for self-hosting, `/v1/me` reports quota.
 - Pure logic lives in `*-core.ts` / `taste.ts` / `highlights-markdown.ts` with `node:test` tests run by
   `npm test` (tsx); keep Expo imports out of those files. SQLite schema is at user_version 2 (sessions table).
 - Booklore has no `/api/v1/app/*` endpoints; `src/lib/providers/booklore.ts` maps its `/api/v1/books` DTOs.

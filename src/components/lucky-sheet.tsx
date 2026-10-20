@@ -10,6 +10,7 @@ import { aiStore } from '@/lib/ai';
 import { bestRating } from '@/lib/home';
 import { authorsLine } from '@/lib/library';
 import { drawLucky, skipBook, type LuckyPick } from '@/lib/lucky';
+import { premiumStore } from '@/lib/premium';
 import { useStore } from '@/lib/store';
 
 interface Props {
@@ -29,7 +30,14 @@ export function LuckySheet({ visible, onClose }: Props) {
 function LuckyBody({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
   const router = useRouter();
-  const ai = useStore(aiStore, (s) => s.mode === 'byok' && s.hasKey);
+  const premiumActive = useStore(premiumStore, (s) => s.active);
+  const ai = useStore(
+    aiStore,
+    (s) =>
+      (s.mode === 'byok' && s.hasKey) ||
+      (s.mode === 'self' && !!s.selfUrl && s.hasSelfToken) ||
+      (s.mode === 'cloud' && premiumActive),
+  );
   const [pick, setPick] = useState<LuckyPick | null | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const [tries, setTries] = useState(0);

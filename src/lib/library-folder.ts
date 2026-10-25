@@ -5,6 +5,7 @@ import {
   iCloudAvailableInBinary,
   iCloudDocumentsUrl,
 } from '../../modules/icloud-container';
+import { comicTitle, readCbz } from './comic-meta';
 import { kvGet, kvSet } from './db';
 import { parseEpubMeta, type EpubMeta } from './epub-meta';
 import { typeFromName } from './formats';
@@ -153,6 +154,31 @@ function indexBook(file: File, id: number, previous: CachedMeta | undefined): Ca
       const author = head.match(/^Author:\s*(.+)$/m)?.[1]?.trim();
       const language = head.match(/^Language:\s*(.+)$/m)?.[1]?.trim();
       meta = { title: title || meta.title, authors: author ? [author] : [], language };
+      return { name, size, firstSeen: previous?.firstSeen ?? new Date().toISOString(), meta, coverUri };
+    }
+    if (type === 'CBX') {
+      // CBZ: ComicInfo.xml and the first page as the cover. CBR needs the RAR decoder that only the reader
+      // page has, so it is listed by file name (and still opens). Very large archives are left alone too.
+      if (!/\.cbz$/i.test(name) || size > 400 * 1024 * 1024) throw new Error('no metadata for this comic');
+      const { info, cover } = readCbz(file.bytesSync());
+      meta = {
+        title: comicTitle(info, name),
+        authors: info?.writers ?? [],
+        language: info?.language,
+        description: info?.summary,
+        publisher: info?.publisher,
+        published: info?.published,
+        series: info?.series,
+        seriesNumber: info?.issue,
+        subjects: info?.genres,
+      };
+      if (cover) {
+        const cf = coverFile(id, cover.ext);
+        if (cf.exists) cf.delete();
+        cf.create();
+        cf.write(cover.bytes);
+        coverUri = cf.uri;
+      }
       return { name, size, firstSeen: previous?.firstSeen ?? new Date().toISOString(), meta, coverUri };
     }
     if (type !== 'EPUB') throw new Error('metadata is only read from EPUB');

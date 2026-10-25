@@ -2,6 +2,7 @@
 // so CFIs for progress and highlights stay compatible with the server and the web UI.
 import '../foliate/view.js';
 import { Overlayer } from '../foliate/overlayer.js';
+import { isComic, makeComic } from './comic.js';
 import { makePDF } from './pdf.js';
 import { makeTxt } from './txt.js';
 
@@ -78,13 +79,15 @@ async function open({ url, name, position, settings: s, annotations }) {
     document.body.append(view);
     wireView(view);
 
-    // foliate sniffs every format it knows; plain text has no signature, so it is picked by name, and PDFs
-    // go through our loader so the reflow setting applies.
+    // foliate sniffs every format it knows; plain text has no signature, so it is picked by name, PDFs go
+    // through our loader so the reflow setting applies, and comics through ours for RAR and reading direction.
     const source = isTxt(file)
       ? await makeTxt(file)
       : (await isPdf(file))
         ? await makePDF(file, { reflow: s.pdfReflow !== false })
-        : file;
+        : (await isComic(file))
+          ? await makeComic(file, { direction: s.comicDirection ?? 'auto' })
+          : file;
     await view.open(source);
     applyRendererSettings(s);
 
@@ -96,10 +99,12 @@ async function open({ url, name, position, settings: s, annotations }) {
       title: book.metadata?.title ?? '',
       toc: serializeToc(book.toc ?? []),
       sections: book.sections?.length ?? 0,
-      // Fixed layout (PDF pages): images with a text layer; no highlights, no read-aloud.
+      // Fixed layout (PDF pages, comics): page images; no highlights, no read-aloud.
       fixed: !!view.isFixedLayout,
       // For PDFs: whether the file has text to reflow, and which mode is showing.
       pdf: book.pdf ?? null,
+      // For comics: format, page count and the reading direction in use.
+      comic: book.comic ?? null,
     });
 
     if (position?.cfi) await view.init({ lastLocation: position.cfi });
@@ -123,6 +128,8 @@ const MIME = {
   fb2: 'application/x-fictionbook+xml',
   mobi: 'application/x-mobipocket-ebook',
   azw3: 'application/vnd.amazon.ebook',
+  cbz: 'application/vnd.comicbook+zip',
+  cbr: 'application/vnd.comicbook-rar',
 };
 const ext = (name) => (name ?? '').toLowerCase().split('.').pop();
 const mimeFor = (name) => MIME[ext(name)] ?? 'application/octet-stream';
@@ -379,8 +386,8 @@ function applyRendererSettings(s) {
   if (view.isFixedLayout) {
     // Rendered pages: fit one page on screen; the margins/fonts/columns below are for reflowable text.
     r.setAttribute('zoom', s.flow === 'scrolled' ? 'fit-width' : 'fit-page');
-    // Dark themes invert the page like Apple Books does; sepia tints it.
-    view.style.filter = s.dark ? 'invert(1) hue-rotate(180deg)' : s.theme === 'sepia' ? 'sepia(.35)' : '';
+    // Dark themes invert PDF pages like Apple Books does; sepia tints them. Comic art is left alone.
+    view.style.filter = view.book?.comic ? '' : s.dark ? 'invert(1) hue-rotate(180deg)' : s.theme === 'sepia' ? 'sepia(.35)' : '';
     return;
   }
   r.setAttribute('flow', s.flow);
@@ -544,7 +551,10 @@ const handlers = {
     applyRendererSettings(s);
     // Switching a text PDF between pages and reflowed text means a different book object: reopen on the
     // same page (both modes have one section per page, so the spine part of the CFI carries over).
-    if (pdf?.text && pdf.reflow !== wantReflow && lastOpen) {
+    // Same for a comic whose reading direction setting changed: the spreads are built when it opens.
+    const comic = view?.book?.comic;
+    const wantDirection = s.comicDirection ?? 'auto';
+    if ((pdf?.text && pdf.reflow !== wantReflow && lastOpen) || (comic && comic.direction !== wantDirection && lastOpen)) {
       const cfi = view.lastLocation?.cfi?.replace(/!.*\)$/, ')') ?? null;
       open({ ...lastOpen, position: cfi ? { cfi, href: null, fraction: 0 } : null, settings: s });
     }

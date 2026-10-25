@@ -7,6 +7,15 @@ import type { ResolvedReaderSettings } from '@/lib/reader-theme';
 import type { Position } from '@/lib/sync';
 import type { Annotation } from '@/lib/types';
 
+export interface ComicInfo {
+  format: 'cbz' | 'cbr';
+  pages: number;
+  rtl: boolean;
+  /** What the archive's own metadata says, so the settings sheet can explain 'Auto'. */
+  infoRtl: boolean;
+  direction: 'auto' | 'ltr' | 'rtl';
+}
+
 export type ReaderEvent =
   | { type: 'ready' }
   | {
@@ -17,6 +26,8 @@ export type ReaderEvent =
       fixed?: boolean;
       /** PDFs only: whether the file has text to reflow and which mode opened. */
       pdf?: { text: boolean; reflow: boolean } | null;
+      /** Comics only: archive format, page count and the reading direction in use. */
+      comic?: ComicInfo | null;
     }
   | {
       type: 'relocate';

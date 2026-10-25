@@ -1,5 +1,5 @@
-// Smoke-tests the bundled reader page in headless Chromium with a real book (EPUB, MOBI, AZW3, FB2, PDF or
-// TXT), driving it over the same postMessage bridge the app uses. Usage: node scripts/test-reader.mjs book.epub
+// Smoke-tests the bundled reader page in headless Chromium with a real book (EPUB, MOBI, AZW3, FB2, PDF,
+// CBZ, CBR or TXT), driving it over the same postMessage bridge the app uses. Usage: node scripts/test-reader.mjs book.epub
 import { createServer } from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -10,7 +10,13 @@ const ext = bookPath.toLowerCase().split('.').pop();
 const bookUrl = `/book.${ext}`;
 const html = readFileSync(resolve('assets/reader/reader.html'));
 const book = readFileSync(bookPath);
-const MIME = { epub: 'application/epub+zip', pdf: 'application/pdf', txt: 'text/plain' };
+const MIME = {
+  epub: 'application/epub+zip',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  cbz: 'application/vnd.comicbook+zip',
+  cbr: 'application/vnd.comicbook-rar',
+};
 
 const server = createServer((req, res) => {
   const extra = resolve('assets/reader', req.url.slice(1));
@@ -19,6 +25,9 @@ const server = createServer((req, res) => {
     res.end(book);
   } else if (/\.webjs$/.test(req.url) && existsSync(extra)) {
     res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    res.end(readFileSync(extra));
+  } else if (/\.wasm$/.test(req.url) && existsSync(extra)) {
+    res.writeHead(200, { 'Content-Type': 'application/wasm' });
     res.end(readFileSync(extra));
   } else {
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -74,12 +83,14 @@ const settings = {
   forceColors: true,
   // PDFs reflow by default; READER_PDF_PAGES=1 tests the rendered-page mode instead.
   pdfReflow: !process.env.READER_PDF_PAGES,
+  // Comics follow their ComicInfo by default; READER_COMIC_DIRECTION=rtl (or ltr) forces the page order.
+  comicDirection: process.env.READER_COMIC_DIRECTION ?? 'auto',
 };
 await send({ type: 'open', url: bookUrl, name: `book.${ext}`, position: null, settings, annotations: [] });
 const errEarly = messages.find((m) => m.type === 'error');
 if (errEarly) console.log('page error:', errEarly.message);
 const loaded = await waitFor('loaded', 30000);
-console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '', loaded.pdf ? JSON.stringify(loaded.pdf) : '');
+console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '', loaded.pdf ? JSON.stringify(loaded.pdf) : '', loaded.comic ? JSON.stringify(loaded.comic) : '');
 const first = await waitFor('relocate');
 console.log('relocate:', first.cfi, first.fraction.toFixed(4), first.tocLabel);
 await settle();
@@ -107,6 +118,17 @@ await settle();
 messages.length = 0;
 
 let selection = null;
+if (loaded.comic) {
+  // Comic pages are single images: one must have decoded to a real size in a live frame.
+  const drawn = await page.evaluate(() =>
+    document
+      .querySelector('foliate-view')
+      ?.renderer?.getContents?.()
+      .some((c) => [...c.doc.images].some((img) => img.complete && img.naturalWidth > 0)),
+  );
+  if (!drawn) throw new Error('no comic page image rendered');
+  console.log('comic page image rendered');
+}
 if (loaded.fixed) {
   console.log('fixed layout: no taps, selections, highlights or read-aloud to test');
   // A leftward swipe on the rendered page turns to the next page.
@@ -130,7 +152,9 @@ if (loaded.fixed) {
   }
   const swiped = await waitFor('relocate', 10000, (m) => m.cfi !== before.cfi);
   console.log('swipe →', swiped.cfi, swiped.fraction.toFixed(3));
-  if (swiped.fraction <= before.fraction) throw new Error('swipe did not advance');
+  // Right-to-left comics turn the other way: a leftward swipe goes back.
+  const advanced = loaded.comic?.rtl ? swiped.fraction < before.fraction : swiped.fraction > before.fraction;
+  if (!advanced) throw new Error('swipe did not advance');
   await settle(300);
   messages.length = 0;
 } else {
@@ -259,6 +283,8 @@ messages.length = 0;
 
 }
 
+if (loaded.comic) console.log('comic: no text to search');
+else {
 // Search the whole book, then jump to the first hit and clear.
 // READER_SEARCH overrides the term (default suits Pride and Prejudice); READER_DUMP=1 prints every hit's CFI.
 const term = process.env.READER_SEARCH ?? 'Netherfield';
@@ -283,6 +309,7 @@ await waitFor('relocate', 10000);
 await send({ type: 'clearSearch' });
 await settle(300);
 messages.length = 0;
+}
 
 // Re-open at the saved CFI and confirm we land on the same spot.
 await send({

@@ -2,6 +2,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'r
 import { useStore } from '@/lib/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import type { ComicInfo } from '@/components/reader/reader-webview';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,6 +22,8 @@ interface Props {
   onClose: () => void;
   /** Set while a PDF is open: whether it has text to reflow, and which mode is showing. */
   pdf?: { text: boolean; reflow: boolean } | null;
+  /** Set while a comic is open: its format, pages and the reading direction in use. */
+  comic?: ComicInfo | null;
 }
 
 function Stepper({
@@ -91,7 +94,7 @@ function Segmented<T extends string | null>({
   );
 }
 
-export function SettingsSheet({ visible, onClose, pdf }: Props) {
+export function SettingsSheet({ visible, onClose, pdf, comic }: Props) {
   const theme = useTheme();
   const s = useStore(settingsStore);
   const set = (patch: Partial<ReaderSettings>) => updateSettings(patch);
@@ -138,6 +141,31 @@ export function SettingsSheet({ visible, onClose, pdf }: Props) {
                   : pdf.reflow
                     ? 'The text is laid out like an ebook. Turn this off to see the original pages.'
                     : 'Showing the original pages: font and spacing come from the file.'}
+              </ThemedText>
+            </>
+          ) : null}
+
+          {comic ? (
+            <>
+              <Segmented
+                label="Reading direction"
+                options={[
+                  { label: 'Auto', value: 'auto' },
+                  { label: 'Left to right', value: 'ltr' },
+                  { label: 'Right to left', value: 'rtl' },
+                ]}
+                value={s.comicDirection}
+                onChange={(v) => set({ comicDirection: v })}
+              />
+              <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
+                {s.comicDirection === 'auto'
+                  ? comic.infoRtl
+                    ? 'This comic says it reads right to left, manga style.'
+                    : 'Reading left to right. Manga marked as such in the archive switches automatically.'
+                  : s.comicDirection === 'rtl'
+                    ? 'Pages turn right to left, as in Japanese manga.'
+                    : 'Pages turn left to right.'}
+                {` ${comic.pages} pages.`}
               </ThemedText>
             </>
           ) : null}

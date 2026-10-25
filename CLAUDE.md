@@ -24,7 +24,16 @@
   swipe handled in main.js). Scanned PDFs with no text layer always get pages. `READER_PDF_PAGES=1` makes
   `test:reader` use pages mode. TXT (`reader-web/src/txt.js`) becomes a reflowable book with
   chapters guessed from heading lines; servers have no TXT type, so it is a folder-library format only.
-- `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/TXT; `READER_SEARCH` sets the search term.
+- Comics: `reader-web/src/comic.js` opens CBZ (zip.js) and CBR (node-unrar-js bundled to `unrar.webjs` +
+  `unrar.wasm` next to reader.html, loaded on first use like pdf.js) as pre-paginated books, one image per
+  section, through foliate's fixed-layout renderer (spreads, cover alone, `book.dir` rtl). Pages are sorted
+  naturally, ComicInfo.xml gives title/writers/Manga direction/DoublePage/Bookmarks; the same rules live in
+  `src/lib/comic-meta.ts` (pure, tested) which the folder library uses for CBZ covers (CBR has no cover there).
+  Servers call the type CBX and store progress as `cbxProgress { page, percentage }` (Position.pageFormat).
+  Reader setting `comicDirection` auto/ltr/rtl reopens the book on change. CB7 is detected and refused.
+  Fixtures `reader-web/test/comic.cbz` and `comic.cbr` come from `reader-web/test/make-comics.py` (PIL;
+  the CBR is a hand-written RAR4 "store" archive since no rar tool is installed).
+- `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/CBZ/CBR/TXT; `READER_SEARCH` sets the search term.
   Books are untrusted: `reader-web/src/main.js` strips `allow-scripts` from every content iframe's sandbox
   (foliate leaves it on), and the test fails if `reader-web/test/scripted.epub` (Alice with a script element,
   an inline handler and a javascript: link injected) manages to set `data-script-ran`. The app only opens

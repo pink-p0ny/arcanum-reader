@@ -2,6 +2,6 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 // The reader runs inside a WebView; its bundled page is shipped as an asset.
-config.resolver.assetExts.push('html', 'webjs');
+config.resolver.assetExts.push('html', 'webjs', 'wasm');
 
 module.exports = config;

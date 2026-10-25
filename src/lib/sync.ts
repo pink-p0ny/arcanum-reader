@@ -1,5 +1,5 @@
 import { isOfflineError } from './api';
-import { cfiForPage, pageFromCfi, typeFromName } from './formats';
+import { cfiForPage, pageFromCfi, pagedType, typeFromName, type PagedType } from './formats';
 import { getProvider } from './provider';
 import {
   deleteLocalAnnotation,
@@ -25,8 +25,10 @@ export interface Position {
   cfi: string | null;
   href: string | null;
   fraction: number;
-  /** 1-based page, set when the file being read is a PDF (servers store PDF progress by page). */
+  /** 1-based page, set when the file being read is a PDF or a comic (servers store those by page). */
   page?: number;
+  /** Which of the two it is, so the provider fills the matching server field. */
+  pageFormat?: PagedType;
 }
 
 async function pushProgress(bookId: number, fileId: number | null, pos: Position, updatedAt: number) {
@@ -35,12 +37,13 @@ async function pushProgress(bookId: number, fileId: number | null, pos: Position
   await markProgressSynced(bookId, updatedAt);
 }
 
-/** Adds the page number for PDFs, worked out from the file on disk and foliate's section CFI. */
+/** Adds the page number for PDFs and comics, worked out from the file on disk and foliate's section CFI. */
 async function withPage(bookId: number, pos: Position): Promise<Position> {
   const dl = await getDownload(bookId);
-  if (!dl || typeFromName(dl.path) !== 'PDF') return pos;
+  const format = dl ? pagedType(typeFromName(dl.path)) : null;
+  if (!format) return pos;
   const page = pageFromCfi(pos.cfi);
-  return page ? { ...pos, page } : pos;
+  return page ? { ...pos, page, pageFormat: format } : pos;
 }
 
 /** The active provider's annotation API, or null for backends that keep highlights on the device only. */
@@ -86,7 +89,7 @@ export async function resolveStartPosition(
       fraction: (server.percentage ?? 0) / 100,
     };
   }
-  const pdf = detail?.pdfProgress;
+  const pdf = detail?.pdfProgress ?? detail?.cbxProgress;
   if (pdf?.page || pdf?.percentage != null) {
     return {
       cfi: pdf.page ? cfiForPage(pdf.page) : null,

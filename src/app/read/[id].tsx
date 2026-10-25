@@ -13,6 +13,7 @@ import {
   type ReaderEvent,
   type ReaderHandle,
   type TocItem,
+  type ComicInfo,
 } from '@/components/reader/reader-webview';
 import { SelectionBar } from '@/components/reader/selection-bar';
 import { SettingsSheet } from '@/components/reader/settings-sheet';
@@ -83,10 +84,12 @@ export default function ReadScreen() {
   const [toc, setToc] = useState<TocItem[]>([]);
   /** The page has opened the book; errors before that are load failures. */
   const pageLoaded = useRef(false);
-  /** Fixed-layout book (PDF pages): rendered pages, so no read-aloud. */
+  /** Fixed-layout book (PDF pages, comics): page images, so no read-aloud. */
   const [fixed, setFixed] = useState(false);
   /** Open PDF: whether it has text and which mode is showing, for the settings sheet. */
   const [pdf, setPdf] = useState<{ text: boolean; reflow: boolean } | null>(null);
+  /** Open comic: format, pages and reading direction, for the settings sheet. */
+  const [comic, setComic] = useState<ComicInfo | null>(null);
   const [showToc, setShowToc] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState<SearchState | null>(null);
@@ -223,6 +226,7 @@ export default function ReadScreen() {
           setToc(e.toc);
           setFixed(!!e.fixed);
           setPdf(e.pdf ?? null);
+          setComic(e.comic ?? null);
           break;
         case 'relocate': {
           const next = {
@@ -253,9 +257,11 @@ export default function ReadScreen() {
         case 'tap':
           if (active) {
             setActive(null);
-          } else if (settings.flow === 'paginated' && e.x < 0.18) reader.current?.send({ type: 'prev' });
-          else if (settings.flow === 'paginated' && e.x > 0.82) reader.current?.send({ type: 'next' });
-          else setChrome((v) => !v);
+          } else if (settings.flow === 'paginated' && (e.x < 0.18 || e.x > 0.82)) {
+            // Edge taps turn the page; a right-to-left comic reads the other way, so its edges swap.
+            const forward = e.x > 0.82 !== !!comic?.rtl;
+            reader.current?.send({ type: forward ? 'next' : 'prev' });
+          } else setChrome((v) => !v);
           break;
         case 'searchResults':
           if (e.id === searchId.current)
@@ -293,7 +299,7 @@ export default function ReadScreen() {
           break;
       }
     },
-    [active, scheduleSave, settings.flow, loaded, tts],
+    [active, scheduleSave, settings.flow, loaded, tts, comic?.rtl],
   );
 
   // ---- highlights ----
@@ -569,7 +575,7 @@ export default function ReadScreen() {
         }}
         onClose={() => setShowToc(false)}
       />
-      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} pdf={pdf} />
+      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} pdf={pdf} comic={comic} />
       <NoteModal
         key={
           noteTarget

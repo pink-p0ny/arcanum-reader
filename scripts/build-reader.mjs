@@ -1,6 +1,6 @@
 // Bundles reader-web (foliate-js + bridge) into one self-contained HTML asset for the WebView.
 import terser from '@rollup/plugin-terser';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rollup } from 'rollup';
@@ -61,4 +61,15 @@ for (const [input, out] of [
   await b.close();
   writeFileSync(resolve(root, 'assets/reader', out), o[0].code);
   console.log(`${out}: ${(o[0].code.length / 1024).toFixed(0)} KB`);
+}
+
+// CBR comics need a RAR decoder: node-unrar-js becomes `unrar.webjs` (global `ArcanumUnrar`) plus its
+// WebAssembly, both copied next to reader.html and fetched the first time a CBR opens.
+{
+  const b = await rollup({ input: resolve(root, 'node_modules/node-unrar-js/esm/index.esm.js'), onwarn() {} });
+  const { output: o } = await b.generate({ format: 'iife', name: 'ArcanumUnrar' });
+  await b.close();
+  writeFileSync(resolve(root, 'assets/reader/unrar.webjs'), o[0].code);
+  copyFileSync(resolve(root, 'node_modules/node-unrar-js/esm/js/unrar.wasm'), resolve(root, 'assets/reader/unrar.wasm'));
+  console.log(`unrar.webjs: ${(o[0].code.length / 1024).toFixed(0)} KB + unrar.wasm`);
 }

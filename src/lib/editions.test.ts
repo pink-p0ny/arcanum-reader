@@ -164,7 +164,7 @@ describe('formats', () => {
     assert.equal(typeFromName('a.azw'), 'AZW3');
     assert.equal(typeFromName('a.pdf'), 'PDF');
     assert.equal(typeFromName('notes.TXT'), 'TXT');
-    assert.equal(typeFromName('a.cbz'), null);
+    assert.equal(typeFromName('a.cbz'), 'CBX');
     const files = [
       {
         id: 1,
@@ -205,7 +205,11 @@ describe('formats', () => {
       name: 'x.mobi',
     });
     assert.deepEqual(pickReadableFile([files[2]], { id: 3, type: 'PDF' }), { id: 3, type: 'PDF', name: 'a.pdf' });
-    assert.equal(pickReadableFile(undefined, { id: 3, type: 'CBX' }), null);
+    assert.deepEqual(pickReadableFile(undefined, { id: 3, type: 'CBX' }), { id: 3, type: 'CBX', name: 'book.cbz' });
+    assert.equal(pickReadableFile(undefined, { id: 3, type: 'AUDIOBOOK' }), null);
+    assert.equal(typeFromName('Saga 001.cbr'), 'CBX');
+    assert.equal(typeFromName('Saga 001.cbz'), 'CBX');
+    assert.equal(typeFromName('Saga 001.cb7'), null);
   });
 
   it('maps PDF pages to foliate section CFIs and back', () => {

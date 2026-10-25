@@ -34,7 +34,9 @@ export const grimmoryProvider: LibraryProvider = {
   async updateProgress(bookId, fileId, pos) {
     const percentage = Math.round(pos.fraction * 100 * 100) / 100;
     const body: UpdateProgressRequest = pos.page
-      ? { pdfProgress: { page: pos.page, percentage } }
+      ? pos.pageFormat === 'CBX'
+        ? { cbxProgress: { page: pos.page, percentage } }
+        : { pdfProgress: { page: pos.page, percentage } }
       : { epubProgress: { cfi: pos.cfi ?? undefined, href: pos.href ?? undefined, percentage } };
     if (fileId != null) {
       body.fileProgress = {

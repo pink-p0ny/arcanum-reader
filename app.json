@@ -36,6 +36,31 @@
             "CFBundleTypeName": "Plain text",
             "LSHandlerRank": "Alternate",
             "LSItemContentTypes": ["public.plain-text"]
+          },
+          {
+            "CFBundleTypeName": "Comic book archive",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["net.snobunny.arcanum.cbz", "net.snobunny.arcanum.cbr"]
+          }
+        ],
+        "UTImportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "net.snobunny.arcanum.cbz",
+            "UTTypeDescription": "Comic book archive (ZIP)",
+            "UTTypeConformsTo": ["public.zip-archive", "public.data"],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": ["cbz"],
+              "public.mime-type": ["application/vnd.comicbook+zip"]
+            }
+          },
+          {
+            "UTTypeIdentifier": "net.snobunny.arcanum.cbr",
+            "UTTypeDescription": "Comic book archive (RAR)",
+            "UTTypeConformsTo": ["public.data", "public.archive"],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": ["cbr"],
+              "public.mime-type": ["application/vnd.comicbook-rar"]
+            }
           }
         ],
         "LSSupportsOpeningDocumentsInPlace": false

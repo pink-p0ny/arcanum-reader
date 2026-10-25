@@ -111,9 +111,11 @@ export interface AppBookDetail {
   isPhysical?: boolean;
   epubProgress?: EpubProgress;
   pdfProgress?: PdfProgress;
+  /** Comics (CBX) keep their position the same way PDFs do. */
+  cbxProgress?: PdfProgress;
 }
 
-/** PDF position as the servers store it: a 1-based page plus the percentage. */
+/** PDF (and comic) position as the servers store it: a 1-based page plus the percentage. */
 export interface PdfProgress {
   page?: number;
   percentage?: number;
@@ -187,5 +189,6 @@ export interface UpdateProgressRequest {
   fileProgress?: BookFileProgress;
   epubProgress?: { cfi?: string; href?: string; percentage: number };
   pdfProgress?: { page: number; percentage: number };
+  cbxProgress?: { page: number; percentage: number };
   dateFinished?: string;
 }

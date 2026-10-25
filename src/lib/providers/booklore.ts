@@ -62,7 +62,7 @@ interface BlBook {
   };
   pdfProgress?: BlProgress & { page?: number };
   epubProgress?: BlProgress;
-  cbxProgress?: BlProgress;
+  cbxProgress?: BlProgress & { page?: number };
   personalRating?: number;
   shelves?: { id: number; name: string; icon?: string }[];
   readStatus?: string;
@@ -158,6 +158,7 @@ function toDetail(b: BlBook): AppBookDetail {
     fileTypes: files.filter((f) => f.isBook).map((f) => f.bookType),
     files,
     epubProgress: b.epubProgress,
+    cbxProgress: b.cbxProgress,
   };
 }
 
@@ -197,7 +198,9 @@ export const bookloreProvider: LibraryProvider = {
       body: JSON.stringify({
         bookId,
         ...(pos.page
-          ? { pdfProgress: { page: pos.page, percentage } }
+          ? pos.pageFormat === 'CBX'
+            ? { cbxProgress: { page: pos.page, percentage } }
+            : { pdfProgress: { page: pos.page, percentage } }
           : { epubProgress: { cfi: pos.cfi ?? undefined, href: pos.href ?? undefined, percentage } }),
       }),
     });

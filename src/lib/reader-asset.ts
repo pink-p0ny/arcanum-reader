@@ -3,12 +3,14 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 let cached: Promise<string> | null = null;
 
-/** The page plus pdf.js, which the page loads from its own folder when a PDF opens. */
+/** The page plus pdf.js and the RAR decoder, which the page loads from its own folder when a PDF or CBR opens. */
 /* eslint-disable @typescript-eslint/no-require-imports */
 const ASSETS: [number, string][] = [
   [require('../../assets/reader/reader.html'), 'reader.html'],
   [require('../../assets/reader/pdfjs.webjs'), 'pdfjs.webjs'],
   [require('../../assets/reader/pdf.worker.webjs'), 'pdf.worker.webjs'],
+  [require('../../assets/reader/unrar.webjs'), 'unrar.webjs'],
+  [require('../../assets/reader/unrar.wasm'), 'unrar.wasm'],
 ];
 /* eslint-enable @typescript-eslint/no-require-imports */
 

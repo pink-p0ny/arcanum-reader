@@ -21,6 +21,8 @@ export interface ReaderSettings {
   hyphenate: boolean;
   /** PDFs with a text layer: rebuild the text as a reflowable book (true) or show the rendered pages. */
   pdfReflow: boolean;
+  /** Comics: page order. 'auto' follows the archive's ComicInfo (manga reads right to left). */
+  comicDirection: 'auto' | 'ltr' | 'rtl';
   ttsRate: number;
   ttsVoice: string | null;
 }
@@ -38,6 +40,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   justify: true,
   hyphenate: true,
   pdfReflow: true,
+  comicDirection: 'auto',
   ttsRate: 1,
   ttsVoice: null,
 };
@@ -90,6 +93,7 @@ export const DISPLAY_SETTING_KEYS = [
   'justify',
   'hyphenate',
   'pdfReflow',
+  'comicDirection',
 ] as const satisfies readonly (keyof ReaderSettings)[];
 
 export function isDefaultDisplay(s: ReaderSettings): boolean {

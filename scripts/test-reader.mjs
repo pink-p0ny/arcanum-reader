@@ -86,7 +86,17 @@ const settings = {
   // Comics follow their ComicInfo by default; READER_COMIC_DIRECTION=rtl (or ltr) forces the page order.
   comicDirection: process.env.READER_COMIC_DIRECTION ?? 'auto',
 };
-await send({ type: 'open', url: bookUrl, name: `book.${ext}`, position: null, settings, annotations: [] });
+// READER_START_CFI opens the book at a saved position, as the app does when it resumes; a CFI that no longer
+// matches the file (another edition, a page CFI from a PDF) must still land on a page.
+const startCfi = process.env.READER_START_CFI ?? null;
+await send({
+  type: 'open',
+  url: bookUrl,
+  name: `book.${ext}`,
+  position: startCfi ? { cfi: startCfi, href: null, fraction: 0 } : null,
+  settings,
+  annotations: [],
+});
 const errEarly = messages.find((m) => m.type === 'error');
 if (errEarly) console.log('page error:', errEarly.message);
 const loaded = await waitFor('loaded', 30000);
@@ -105,11 +115,13 @@ messages.length = 0;
 // Jump to a TOC entry, then to a fraction.
 // An entry from the middle of the book, so the jump is a real move away from the second page.
 const withHref = loaded.toc.filter((t) => t.href);
-const chapter = withHref[Math.floor(withHref.length / 2)] ?? loaded.toc[0];
-await send({ type: 'goTo', target: chapter.href });
-const r3 = await waitFor('relocate', 10000, (m) => m.cfi !== second.cfi);
-console.log('goTo', chapter.label, '→', r3.tocLabel, r3.cfi);
-await settle();
+const chapter = withHref[Math.floor(withHref.length / 2)];
+if (chapter) {
+  await send({ type: 'goTo', target: chapter.href });
+  const r3 = await waitFor('relocate', 10000, (m) => m.cfi !== second.cfi);
+  console.log('goTo', chapter.label, '→', r3.tocLabel, r3.cfi);
+  await settle();
+} else console.log('no contents to jump to');
 messages.length = 0;
 await send({ type: 'goToFraction', fraction: 0.5 });
 const r4 = await waitFor('relocate', 10000, (m) => Math.abs(m.fraction - 0.5) < 0.05);

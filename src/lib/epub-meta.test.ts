@@ -90,4 +90,12 @@ describe('decodeEntities', () => {
   it('handles named, decimal and hex entities', () => {
     assert.equal(decodeEntities('a &amp; b &#233; &#x1F525; &unknown;'), 'a & b é 🔥 &unknown;');
   });
+  it('knows the HTML names book blurbs use, case included', () => {
+    assert.equal(
+      decodeEntities('Caf&eacute; &Eacute;lan&nbsp;&mdash;&nbsp;&ldquo;Dune&rdquo;&hellip; Kindle&reg; &copy; &trade; &frac12; &sup2;'),
+      'Café Élan\u00a0—\u00a0“Dune”… Kindle® © ™ ½ ²',
+    );
+    // A name in the wrong case still decodes, to the lowercase form.
+    assert.equal(decodeEntities('&NBSP;&EACUTE;'), '\u00a0é');
+  });
 });

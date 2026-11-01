@@ -107,11 +107,7 @@ async function open({ url, name, position, settings: s, annotations }) {
       comic: book.comic ?? null,
     });
 
-    if (position?.cfi) await view.init({ lastLocation: position.cfi });
-    else if (position?.fraction > 0) {
-      await view.init({ showTextStart: true });
-      await view.goToFraction(position.fraction);
-    } else await view.init({ showTextStart: true });
+    await showStart(position);
 
     for (const a of annotations ?? []) view.addAnnotation({ value: a.cfi }).catch(() => {});
     status('');
@@ -119,6 +115,31 @@ async function open({ url, name, position, settings: s, annotations }) {
     status('');
     post({ type: 'error', message: e?.message ?? String(e), stack: e?.stack });
   }
+}
+
+/**
+ * Lands the view on its first page. foliate's `init` trusts the book: a "start of text" landmark that points
+ * at a file outside the spine (converted EPUBs do this), or a saved CFI that no longer matches the file
+ * (another edition, a reconverted book), makes its goTo fail quietly and the reader showed an empty page
+ * that no tap could turn. So every attempt is checked for a displayed page, falling back from the saved
+ * position to its fraction, then the text start, then the first linear section.
+ */
+async function showStart(position) {
+  const displayed = () => !!view.lastLocation && view.renderer.getContents().length > 0;
+  const attempts = [];
+  if (position?.cfi) attempts.push(() => view.init({ lastLocation: position.cfi }));
+  if (position?.fraction > 0) attempts.push(() => view.goToFraction(position.fraction));
+  attempts.push(() => view.init({ showTextStart: true }));
+  attempts.push(() => view.goTo(Math.max(0, view.book.sections.findIndex((s) => s.linear !== 'no'))));
+  for (const attempt of attempts) {
+    try {
+      await attempt();
+    } catch (e) {
+      console.warn('[reader] start attempt failed', e);
+    }
+    if (displayed()) return;
+  }
+  throw new Error('Could not show the first page of this book');
 }
 
 const MIME = {

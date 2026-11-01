@@ -33,7 +33,12 @@
   Reader setting `comicDirection` auto/ltr/rtl reopens the book on change. CB7 is detected and refused.
   Fixtures `reader-web/test/comic.cbz` and `comic.cbr` come from `reader-web/test/make-comics.py` (PIL;
   the CBR is a hand-written RAR4 "store" archive since no rar tool is installed).
-- `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/CBZ/CBR/TXT; `READER_SEARCH` sets the search term.
+- `npm run test:reader -- <file>` accepts EPUB/MOBI/FB2/PDF/CBZ/CBR/TXT; `READER_SEARCH` sets the search term and
+  `READER_START_CFI` opens at a saved position. Opening never trusts the book: `showStart` in `main.js` checks
+  that a page is displayed after each attempt (saved CFI, its fraction, text start, first linear section),
+  because foliate's `init` fails quietly on a landmark outside the spine or a CFI from another edition and
+  used to leave an empty page nothing could turn. `reader-web/test/badstart.epub` (from `make-badstart.py`)
+  has both faults; the stale-CFI case is `READER_START_CFI='epubcfi(/6/999)'` on any EPUB.
   Books are untrusted: `reader-web/src/main.js` strips `allow-scripts` from every content iframe's sandbox
   (foliate leaves it on), and the test fails if `reader-web/test/scripted.epub` (Alice with a script element,
   an inline handler and a javascript: link injected) manages to set `data-script-ran`. The app only opens

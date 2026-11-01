@@ -22,6 +22,7 @@ import { getProvider } from '@/lib/provider';
 import { getBook, getBooks, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
 import { siblingEditions } from '@/lib/editions';
+import { decodeEntities, parseEpubMeta } from '@/lib/epub-meta';
 import { pickReadableFile } from '@/lib/formats';
 import { isFolderBook } from '@/lib/library-folder';
 import { authorsLine } from '@/lib/library';
@@ -29,13 +30,16 @@ import { shareHighlights } from '@/lib/export';
 import { loadAnnotations } from '@/lib/sync';
 import type { AppBookDetail, AppBookSummary } from '@/lib/types';
 
+/** Blurbs arrive as HTML from servers (and sometimes HTML escaped twice); show them as plain paragraphs. */
 function stripHtml(s?: string) {
-  return (s ?? '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  const strip = (t: string) =>
+    t
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '');
+  let text = decodeEntities(strip(s ?? ''));
+  if (/<\/?(p|br|b|i|em|strong|div|span)\b/i.test(text)) text = decodeEntities(strip(text));
+  return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function Rating({ label, value, count }: { label: string; value?: number; count?: number }) {
@@ -88,6 +92,23 @@ export default function BookScreen() {
     ? { ...(cached.data ?? {}), ...detail.data }
     : cached.data;
 
+  // A server with no blurb for a book that carries one inside the EPUB: read it from the downloaded file.
+  // Folder books already take everything from the file, so they never need this.
+  const file = download.data;
+  const fileDescription = useQuery({
+    queryKey: ['fileDescription', bookId, file?.uri ?? null],
+    enabled:
+      !!book &&
+      !book.description &&
+      !isFolderBook(bookId) &&
+      !!file &&
+      /\.epub$/i.test(file.uri) &&
+      (file.size ?? 0) <= 200 * 1024 * 1024,
+    queryFn: () => parseEpubMeta(file!.bytesSync()).description ?? null,
+    retry: false,
+    staleTime: Infinity,
+  });
+
   if (!book) {
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}>
@@ -125,7 +146,7 @@ export default function BookScreen() {
     : 'Download & Read';
   const primaryAction = downloaded ? openReader : openReader; // the reader downloads on demand if needed
 
-  const description = stripHtml(book.description);
+  const description = stripHtml(book.description || fileDescription.data || undefined);
   const coverWidth = wide ? 260 : Math.min(220, width * 0.5);
 
   return (

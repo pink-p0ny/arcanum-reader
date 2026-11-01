@@ -16,15 +16,83 @@ export interface EpubMeta {
 
 const decoder = new TextDecoder();
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+// The named entities that turn up in book blurbs and OPF metadata: XML's five, Latin-1 (&nbsp; … &yuml;,
+// code points 160–255 in this order) and the common punctuation and symbols. Names are case-sensitive
+// (&Eacute; is not &eacute;); a name nobody writes in the right case still gets a lowercase match.
+const LATIN1 =
+  'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute ' +
+  'micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig ' +
+  'Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash ' +
+  'Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc ' +
+  'euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml ' +
+  'yacute thorn yuml';
+const ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  ...Object.fromEntries(LATIN1.split(' ').map((name, i) => [name, String.fromCodePoint(160 + i)])),
+  OElig: 'Œ',
+  oelig: 'œ',
+  Scaron: 'Š',
+  scaron: 'š',
+  Yuml: 'Ÿ',
+  fnof: 'ƒ',
+  circ: 'ˆ',
+  tilde: '˜',
+  ensp: '\u2002',
+  emsp: '\u2003',
+  thinsp: '\u2009',
+  zwnj: '\u200c',
+  zwj: '\u200d',
+  lrm: '\u200e',
+  rlm: '\u200f',
+  ndash: '–',
+  mdash: '—',
+  lsquo: '‘',
+  rsquo: '’',
+  sbquo: '‚',
+  ldquo: '“',
+  rdquo: '”',
+  bdquo: '„',
+  dagger: '†',
+  Dagger: '‡',
+  bull: '•',
+  hellip: '…',
+  permil: '‰',
+  prime: '′',
+  Prime: '″',
+  lsaquo: '‹',
+  rsaquo: '›',
+  euro: '€',
+  trade: '™',
+  larr: '←',
+  uarr: '↑',
+  rarr: '→',
+  darr: '↓',
+  harr: '↔',
+  minus: '−',
+  infin: '∞',
+  ne: '≠',
+  le: '≤',
+  ge: '≥',
+  hearts: '♥',
+  spades: '♠',
+  clubs: '♣',
+  diams: '♦',
+};
+const ENTITIES_LOWER: Record<string, string> = Object.fromEntries(
+  Object.entries(ENTITIES).map(([k, v]) => [k.toLowerCase(), v]),
+);
 export function decodeEntities(s: string): string {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, code: string) => {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (m, code: string) => {
     if (code[0] === '#') {
       const n =
         code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+      return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : m;
     }
-    return ENTITIES[code.toLowerCase()] ?? m;
+    return ENTITIES[code] ?? ENTITIES_LOWER[code.toLowerCase()] ?? m;
   });
 }
 

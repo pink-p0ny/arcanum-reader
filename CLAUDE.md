@@ -39,6 +39,14 @@
   because foliate's `init` fails quietly on a landmark outside the spine or a CFI from another edition and
   used to leave an empty page nothing could turn. `reader-web/test/badstart.epub` (from `make-badstart.py`)
   has both faults; the stale-CFI case is `READER_START_CFI='epubcfi(/6/999)'` on any EPUB.
+  Swipes in reflowable books: foliate's paginator drags the page and snaps on release, but decides from the
+  last touchmove sample (or half a page of travel) and keeps taking touches while a snap animates or the
+  next chapter loads, when its scroll bounds are stale (a second swipe then lands on the chapter start).
+  `guardSwipes` in `main.js` (capture listeners on the book document and on reader.html) decides the
+  release from the whole gesture and calls `renderer.snap(±2|0)`, and swallows touches, taps' next/prev
+  included, while `turning` (cleared by the paginator's relocate off the blank pad pages, 1.2 s fallback).
+  `test:reader` simulates slow drags, flicks and a double swipe; the book frame has no scripts, so the
+  gesture is paced from Node and each touch goes to the live frame.
   Books are untrusted: `reader-web/src/main.js` strips `allow-scripts` from every content iframe's sandbox
   (foliate leaves it on), and the test fails if `reader-web/test/scripted.epub` (Alice with a script element,
   an inline handler and a javascript: link injected) manages to set `data-script-ran`. The app only opens

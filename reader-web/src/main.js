@@ -89,6 +89,7 @@ async function open({ url, name, position, settings: s, annotations }) {
           ? await makeComic(file, { direction: s.comicDirection ?? 'auto' })
           : file;
     await view.open(source);
+    if (!view.isFixedLayout) trackTurns(view.renderer);
     applyRendererSettings(s);
 
     for (const a of annotations ?? []) annotationStyles.set(a.cfi, { color: a.color, style: a.style });
@@ -194,6 +195,7 @@ function wireView(v) {
     doc.addEventListener('selectionchange', () => scheduleSelection(doc, index));
     wireTaps(doc);
     if (v.isFixedLayout) wireSwipes(doc);
+    else guardSwipes(doc);
   });
 
   v.addEventListener('draw-annotation', (e) => {
@@ -304,6 +306,115 @@ function wireTaps(doc) {
     { passive: true },
   );
 }
+
+// ---------- swipes in reflowable books ----------
+// foliate's paginator drags the page under the finger and snaps on release. Two things go wrong with that
+// on an iPad: the release is decided from the last touchmove sample alone and otherwise needs half a page
+// of travel (600px on a two-column spread), so a swipe that slows before lift-off snaps back; and touches
+// keep being accepted while a snap animates or the next chapter loads, when the paginator's scroll bounds
+// still belong to the previous position, so a second swipe is clamped to the old offsets, which on a
+// freshly loaded chapter is its first page. The drag stays foliate's; the release is decided here from the
+// whole gesture, and touches are kept away from foliate while a turn is in flight.
+let turning = false;
+let turningTimer = null;
+function beginTurn() {
+  turning = true;
+  clearTimeout(turningTimer);
+  turningTimer = setTimeout(() => (turning = false), 1200);
+}
+function endTurn() {
+  turning = false;
+  clearTimeout(turningTimer);
+}
+const trackedRenderers = new WeakSet();
+function trackTurns(renderer) {
+  if (trackedRenderers.has(renderer)) return;
+  trackedRenderers.add(renderer);
+  renderer.addEventListener('relocate', (e) => {
+    const { fraction } = e.detail ?? {};
+    // The blank page either side of a chapter means a section change is still to come.
+    if (fraction < 0 || fraction >= 1) return;
+    endTurn();
+  });
+}
+
+function guardSwipes(doc) {
+  let gesture = null;
+  const selected = () => {
+    const sel = doc.getSelection?.();
+    return !!sel && !sel.isCollapsed && !!sel.toString().trim();
+  };
+  const opts = { capture: true, passive: false };
+  doc.addEventListener(
+    'touchstart',
+    (ev) => {
+      const t = ev.touches[0];
+      if (!view || view.isFixedLayout || view.renderer?.scrolled || selected() || !t) {
+        gesture = null;
+        return;
+      }
+      gesture = {
+        x0: t.clientX,
+        y0: t.clientY,
+        samples: [{ x: t.clientX, t: ev.timeStamp }],
+        swallowed: turning,
+        multi: ev.touches.length > 1,
+      };
+      if (gesture.swallowed) ev.stopPropagation();
+    },
+    opts,
+  );
+  doc.addEventListener(
+    'touchmove',
+    (ev) => {
+      const g = gesture;
+      if (!g) return;
+      if (ev.touches.length > 1) g.multi = true;
+      if (g.swallowed) {
+        ev.stopPropagation();
+        if (ev.cancelable && !selected()) ev.preventDefault();
+        return;
+      }
+      const t = ev.touches[0];
+      if (!t) return;
+      g.samples.push({ x: t.clientX, t: ev.timeStamp });
+      if (g.samples.length > 30) g.samples.shift();
+    },
+    opts,
+  );
+  const release = (ev) => {
+    const g = gesture;
+    gesture = null;
+    if (!g) return;
+    if (g.swallowed) {
+      ev.stopPropagation();
+      return;
+    }
+    // Pinches, a finger still down, cancelled touches and selections stay with foliate as before.
+    if (g.multi || ev.touches.length > 0 || ev.type === 'touchcancel' || selected()) return;
+    const t = ev.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - g.x0;
+    const dy = t.clientY - g.y0;
+    if (Math.hypot(dx, dy) <= 12) return; // a tap: wireTaps handles it, foliate's snap stays put
+    ev.stopPropagation(); // foliate's own release handler would decide from one sample
+    const now = ev.timeStamp;
+    const recent = g.samples.find((smp) => now - smp.t <= 120) ?? g.samples[g.samples.length - 1];
+    const v = (t.clientX - recent.x) / Math.max(1, now - recent.t); // px per ms, positive to the right
+    const width = window.innerWidth || 1;
+    const far = Math.abs(dx) > width * 0.12;
+    const flick = Math.abs(v) > 0.3 && Math.sign(v) === Math.sign(dx);
+    const turn = Math.abs(dx) > Math.abs(dy) && (far || flick);
+    beginTurn();
+    // foliate's velocity is positive when the finger moves left, the next page in a left-to-right book;
+    // two pages per millisecond is clamped to the one page its bounds allow.
+    view.renderer.snap(turn ? -Math.sign(dx) * 2 : 0, 0);
+  };
+  doc.addEventListener('touchend', release, opts);
+  doc.addEventListener('touchcancel', release, opts);
+}
+// Touches on the margins, running heads and footer happen in this document, not in the book's.
+guardSwipes(document);
 
 // foliate's fixed-layout renderer (PDF) turns pages on tap and keyboard only; the paginator handles swipes
 // itself. A quick, mostly horizontal, single-finger drag turns the page.
@@ -580,8 +691,16 @@ const handlers = {
       open({ ...lastOpen, position: cfi ? { cfi, href: null, fraction: 0 } : null, settings: s });
     }
   },
-  next: () => view?.next(),
-  prev: () => view?.prev(),
+  next: () => {
+    if (turning || !view || view.renderer?.atEnd === true) return;
+    beginTurn();
+    view.next();
+  },
+  prev: () => {
+    if (turning || !view || view.renderer?.atStart === true) return;
+    beginTurn();
+    view.prev();
+  },
   // Like view.goTo, but waits for `resolveHref`: it is async for PDF links, which the vendored view.js
   // does not await.
   goTo: async ({ target }) => {

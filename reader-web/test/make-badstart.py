@@ -28,7 +28,17 @@ def build(path):
     manifest = ''.join(
         f'<item id="c{i}" href="c{i}.xhtml" media-type="application/xhtml+xml"/>' for i in range(len(CHAPTERS))
     )
-    spine = ''.join(f'<itemref idref="c{i}"/>' for i in range(len(CHAPTERS)))
+    manifest += '<item id="contents" href="contents.xhtml" media-type="application/xhtml+xml"/>'
+    spine = '<itemref idref="contents"/>' + ''.join(f'<itemref idref="c{i}"/>' for i in range(len(CHAPTERS)))
+    # A contents page like real books have: one link as the manifest spells it, one in the wrong case, one
+    # to a file that is not there (data-expect says what test:reader should see).
+    contents = '''<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Contents</title></head>
+<body><h1>Contents</h1>
+<p><a href="c0.xhtml" data-expect="Chapter One">Chapter One</a></p>
+<p><a href="C1.XHTML" data-expect="Chapter Two">Chapter Two</a></p>
+<p><a href="nowhere.xhtml" data-expect="none">Nowhere</a></p>
+</body></html>'''
     opf = f'''<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -58,6 +68,7 @@ def build(path):
         z.writestr('OEBPS/content.opf', opf, zipfile.ZIP_DEFLATED)
         z.writestr('OEBPS/nav.xhtml', nav, zipfile.ZIP_DEFLATED)
         z.writestr('OEBPS/cover.png', png)
+        z.writestr('OEBPS/contents.xhtml', contents, zipfile.ZIP_DEFLATED)
         for i, (t, b) in enumerate(CHAPTERS):
             z.writestr(f'OEBPS/c{i}.xhtml', xhtml(t, b), zipfile.ZIP_DEFLATED)
 

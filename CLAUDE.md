@@ -47,6 +47,9 @@
   included, while `turning` (cleared by the paginator's relocate off the blank pad pages, 1.2 s fallback).
   `test:reader` simulates slow drags, flicks and a double swipe; the book frame has no scripts, so the
   gesture is paced from Node and each touch goes to the live frame.
+  Links inside a book go through `followLink` in `main.js` (foliate's 'link' event is cancelled): resolve,
+  else match by file name ignoring folders and case, else an on-page notice; `badstart.epub` opens on a
+  contents page with all three cases and `test:reader` clicks them (`data-expect` says where each lands).
   Books are untrusted: `reader-web/src/main.js` strips `allow-scripts` from every content iframe's sandbox
   (foliate leaves it on), and the test fails if `reader-web/test/scripted.epub` (Alice with a script element,
   an inline handler and a javascript: link injected) manages to set `data-script-ran`. The app only opens

@@ -226,6 +226,57 @@ function wireView(v) {
     e.preventDefault();
     post({ type: 'externalLink', href: e.detail.href });
   });
+
+  // Links inside the book. foliate's own handler goes quiet when a target does not resolve (a contents
+  // page whose hrefs differ in case or folder from the manifest, a fragment that is not there), so the
+  // navigation is done here: resolve, fall back to a file-name match, and say so when nothing fits.
+  v.addEventListener('link', (e) => {
+    e.preventDefault();
+    followLink(e.detail?.href).catch((err) => console.warn('[reader] link', err));
+  });
+}
+
+async function followLink(href) {
+  if (!href || !view) return;
+  const { book } = view;
+  const valid = (t) => !!t && Number.isInteger(t.index) && t.index >= 0 && t.index < (book.sections?.length ?? 0);
+  let target = null;
+  try {
+    target = await view.resolveNavigation(href);
+  } catch (err) {
+    console.warn('[reader] link did not resolve', href, err);
+  }
+  if (!valid(target)) target = looseLink(book, href);
+  if (!valid(target)) {
+    console.warn('[reader] link target not in book:', href);
+    notice('This link goes nowhere in the book');
+    return;
+  }
+  await view.renderer.goTo(target);
+  view.history?.pushState?.(href);
+}
+
+/** Matches a link by file name alone, ignoring folders and case, when the exact path is not in the book. */
+function looseLink(book, href) {
+  const [path, hash] = String(href).split('#');
+  const tail = (p) => {
+    try {
+      p = decodeURIComponent(p);
+    } catch {}
+    return p.split('/').pop().toLowerCase();
+  };
+  const want = tail(path);
+  if (!want) return null;
+  const index = (book.sections ?? []).findIndex((s) => typeof s.id === 'string' && tail(s.id) === want);
+  if (index < 0) return null;
+  return { index, anchor: hash ? (doc) => doc.getElementById(hash) ?? 0 : 0 };
+}
+
+let noticeTimer = null;
+function notice(text) {
+  status(text);
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => status(''), 2500);
 }
 
 // iOS WebKit only synthesises `click` from a tap when the target looks interactive, so a delegated click

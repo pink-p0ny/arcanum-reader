@@ -103,6 +103,45 @@ const loaded = await waitFor('loaded', 30000);
 console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '', loaded.pdf ? JSON.stringify(loaded.pdf) : '', loaded.comic ? JSON.stringify(loaded.comic) : '');
 const first = await waitFor('relocate');
 console.log('relocate:', first.cfi, first.fraction.toFixed(4), first.tocLabel);
+
+// Links on the opening page (a contents page in badstart.epub): each one either lands in the book, or is
+// marked data-expect="none" and must leave the position alone.
+const liveNow = () => page.frames().filter((f) => f !== page.mainFrame() && !f.isDetached()).at(-1);
+const links = await liveNow().evaluate(() =>
+  [...document.querySelectorAll('a[href]')]
+    .filter((a) => !/^\w+:/.test(a.getAttribute('href')))
+    .slice(0, 3)
+    .map((a) => ({ href: a.getAttribute('href'), expect: a.dataset.expect ?? null })),
+);
+for (const [i, link] of links.entries()) {
+  if (i > 0) {
+    messages.length = 0;
+    await send({ type: 'goTo', target: 0 });
+    await waitFor('relocate', 5000);
+    await settle(300);
+  }
+  messages.length = 0;
+  await liveNow().evaluate((n) => {
+    const a = [...document.querySelectorAll('a[href]')].filter((x) => !/^\w+:/.test(x.getAttribute('href')))[n];
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }, i);
+  if (link.expect === 'none') {
+    await settle(1200);
+    const moved = messages.find((m) => m.type === 'relocate' && m.cfi !== first.cfi);
+    if (moved) throw new Error(`link ${link.href} should go nowhere but relocated to ${moved.cfi}`);
+    console.log('link', link.href, '→ stays, as expected');
+  } else {
+    const r = await waitFor('relocate', 5000, (m) => m.cfi !== first.cfi);
+    if (link.expect && r.tocLabel !== link.expect) throw new Error(`link ${link.href} landed on ${r.tocLabel}, expected ${link.expect}`);
+    console.log('link', link.href, '→', r.tocLabel ?? r.cfi);
+  }
+}
+if (links.length) {
+  messages.length = 0;
+  await send({ type: 'goTo', target: 0 });
+  await waitFor('relocate', 5000);
+  await settle(300);
+}
 await settle();
 messages.length = 0;
 

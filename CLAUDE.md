@@ -21,8 +21,15 @@
   Settings) pulls the text out with pdf.js and rebuilds paragraphs/headings as a reflowable book (highlights,
   search, read-aloud and every typography setting work; running heads and page numbers are dropped), while
   pages mode renders each page to a canvas with a text layer (fixed layout: no highlights or read-aloud,
-  swipe handled in main.js). Scanned PDFs with no text layer always get pages. `READER_PDF_PAGES=1` makes
-  `test:reader` use pages mode. TXT (`reader-web/src/txt.js`) becomes a reflowable book with
+  swipe handled in main.js). Scans get pages by default: `isScanned` in pdf.js samples four pages for one
+  image covering the page (operator list + transform), and such a PDF reflows only with the separate
+  `pdfReflowScans` setting (`READER_PDF_REFLOW_SCANS=1` in `test:reader`; `book.pdf.scanned` drives the
+  settings-sheet copy); a PDF with no text layer always gets pages. Reflow repairs for OCR layers: soft
+  hyphens (U+00AD) at line ends become joins, a lone big letter (drop cap) rejoins its paragraph, a running
+  head glued to another line is stripped, and item widths are capped at 1em per glyph so OCR word boxes
+  do not swallow the space before the next word. `reader-web/test/scan.pdf` (from `make-scan.py`, hand
+  written PDF: full-page JPEG + invisible text) is the fixture. `READER_PDF_PAGES=1` makes `test:reader`
+  use pages mode for any PDF. TXT (`reader-web/src/txt.js`) becomes a reflowable book with
   chapters guessed from heading lines; servers have no TXT type, so it is a folder-library format only.
 - Comics: `reader-web/src/comic.js` opens CBZ (zip.js) and CBR (node-unrar-js bundled to `unrar.webjs` +
   `unrar.wasm` next to reader.html, loaded on first use like pdf.js) as pre-paginated books, one image per
@@ -56,6 +63,10 @@
   http(s)/mailto links out of a book.
   Reader errors before the book opens are shown on screen and stored in kv `lastReaderError`
   (`sqlite3 <app>/Documents/SQLite/grimmory.db` on a simulator).
+- Titles pass through `cleanTitle` (`src/lib/editions.ts`) when server books are stored and on the book and
+  reader screens: a title that is a path or URL (a text file printed to PDF keeps `file:///C|/...TXT` as its
+  Title) gives way to the file name. Blurbs on the book page go through `stripHtml` there: every block tag
+  is a break, entities are decoded, and raw newlines are whitespace in HTML but wrapped lines in plain text.
 - Edition grouping (`src/lib/editions.ts`): base title (subtitle after `:`/dash dropped), apostrophes ignored,
   author name parts sorted ("Barr, Nevada" = "Nevada Barr"), a missing author or bare title joins the group
   when the rest agree. `node scripts/grimmory.mjs dupes` lists what a server still shows as separate cards.

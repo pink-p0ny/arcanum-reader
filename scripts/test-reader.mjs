@@ -83,6 +83,8 @@ const settings = {
   forceColors: true,
   // PDFs reflow by default; READER_PDF_PAGES=1 tests the rendered-page mode instead.
   pdfReflow: !process.env.READER_PDF_PAGES,
+  // Scanned PDFs (one image per page, OCR text) show their pages unless READER_PDF_REFLOW_SCANS=1.
+  pdfReflowScans: !!process.env.READER_PDF_REFLOW_SCANS,
   // Comics follow their ComicInfo by default; READER_COMIC_DIRECTION=rtl (or ltr) forces the page order.
   comicDirection: process.env.READER_COMIC_DIRECTION ?? 'auto',
 };
@@ -103,6 +105,12 @@ const loaded = await waitFor('loaded', 30000);
 console.log('loaded:', loaded.title, '| toc entries:', loaded.toc.length, '| sections:', loaded.sections, loaded.fixed ? '| fixed layout' : '', loaded.pdf ? JSON.stringify(loaded.pdf) : '', loaded.comic ? JSON.stringify(loaded.comic) : '');
 const first = await waitFor('relocate');
 console.log('relocate:', first.cfi, first.fraction.toFixed(4), first.tocLabel);
+if (loaded.pdf?.scanned) {
+  const want = !!process.env.READER_PDF_REFLOW_SCANS;
+  if (loaded.pdf.reflow !== want) throw new Error(`scanned PDF reflow=${loaded.pdf.reflow}, expected ${want}`);
+  if (!loaded.pdf.text) throw new Error('scanned PDF with OCR text reported no text');
+  console.log('scanned PDF:', want ? 'reflowed on request' : 'shown as pages');
+} else if (loaded.pdf && /scan/.test(process.argv[2] ?? '')) throw new Error('scan fixture not detected as scanned');
 
 // Links on the opening page (a contents page in badstart.epub): each one either lands in the book, or is
 // marked data-expect="none" and must leave the position alone.
@@ -281,45 +289,50 @@ const drag = (x0, x1, steps, stepMs, hold = 0) => {
   if (hold) pts.push({ x: x1 + Math.sign(x1 - x0), y: 300, wait: hold, release: 40 });
   return pts;
 };
-const cur = () => messages.filter((m) => m.type === 'relocate').at(-1)?.cfi ?? r4.cfi;
-const settled = async (ms) => {
-  await settle(ms);
-  return [...new Set(messages.filter((m) => m.type === 'relocate').map((m) => m.cfi))];
+// Where the reader comes to rest: a turn across a section reports the blank page in between and then the
+// destination, so wait until relocates stop before reading the last one.
+const restingPlace = async (fallback) => {
+  let last = messages.filter((m) => m.type === 'relocate').length;
+  const until = Date.now() + 4000;
+  let quiet = 0;
+  while (Date.now() < until && quiet < 700) {
+    await settle(100);
+    const n = messages.filter((m) => m.type === 'relocate').length;
+    if (n === last) quiet += 100;
+    else {
+      last = n;
+      quiet = 0;
+    }
+  }
+  return messages.filter((m) => m.type === 'relocate').at(-1) ?? fallback;
 };
 // 1. A long drag that slows to a stop before lift-off still turns the page (foliate alone needs half a page).
 messages.length = 0;
 await swipe(drag(700, 480, 12, 25, 250));
-const s1 = await waitFor('relocate', 3000, (m) => m.cfi !== r4.cfi);
-if (!(s1.fraction > r4.fraction)) throw new Error('slow drag did not turn forward');
-await settle(500);
+const s1 = await restingPlace(r4);
+if (s1.cfi === r4.cfi || !(s1.fraction > r4.fraction)) throw new Error('slow drag did not turn forward');
 // 2. A short drag goes back where it was.
 messages.length = 0;
 await swipe(drag(700, 660, 8, 30, 250));
-const moved2 = (await settled(900)).filter((c) => c !== s1.cfi);
-if (moved2.length) throw new Error('short drag turned the page: ' + moved2.join(','));
+const s2 = await restingPlace(s1);
+if (s2.cfi !== s1.cfi) throw new Error(`short drag turned the page: ${s2.cfi}`);
 // 3. A quick flick back returns to the page before.
 messages.length = 0;
 await swipe(drag(400, 470, 4, 12));
-const s3 = await waitFor('relocate', 3000, (m) => m.cfi !== s1.cfi);
+const s3 = await restingPlace(s2);
 if (s3.cfi !== r4.cfi) throw new Error(`flick back landed on ${s3.cfi}, expected ${r4.cfi}`);
-await settle(500);
-// 4. A second swipe while the first is still turning is ignored instead of landing on stale offsets.
+// 4. A second swipe while the first is still turning is ignored instead of landing on stale offsets: a
+// single flick forward must come back to the start page.
 messages.length = 0;
 await swipe(drag(400, 470, 4, 12));
 await settle(50);
 await swipe(drag(400, 470, 4, 12));
-// A turn that crosses a section also reports the blank page in between, so count by where a single flick
-// forward lands: back on the start page only if the second swipe was ignored.
-const after4 = (await settled(1500)).filter((c) => c !== r4.cfi);
-if (!after4.length) throw new Error('double swipe did not move');
-const s4 = cur();
+const s4 = await restingPlace(s3);
+if (s4.cfi === r4.cfi) throw new Error('double swipe did not move');
 messages.length = 0;
 await swipe(drag(700, 600, 4, 12));
-try {
-  await waitFor('relocate', 3000, (m) => m.cfi === r4.cfi);
-} catch {
-  throw new Error(`flick forward did not return to ${r4.cfi}, last at ${cur()} (was the second swipe applied?)`);
-}
+const s5 = await restingPlace(s4);
+if (s5.cfi !== r4.cfi) throw new Error(`flick forward landed on ${s5.cfi}, expected ${r4.cfi} (was the second swipe applied?)`);
 console.log('swipes: slow drag turns, short drag stays, flick back returns, second swipe during a turn ignored');
 await settle(300);
 frame = liveFrame();
@@ -331,6 +344,11 @@ const selectText = () => {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) if (node.textContent.trim().length > 40) break;
+  if (!node) {
+    // Short pages (a reflowed scan with a few OCR lines per page): any sentence will do.
+    const w2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while ((node = w2.nextNode())) if (node.textContent.trim().length > 10) break;
+  }
   const range = document.createRange();
   range.setStart(node, 0);
   range.setEnd(node, Math.min(30, node.length));
@@ -358,6 +376,10 @@ const dragCancelled = (withSelection) =>
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) if (node.textContent.trim().length > 40) break;
+    if (!node) {
+      const w2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      while ((node = w2.nextNode())) if (node.textContent.trim().length > 10) break;
+    }
     const p = node.parentElement;
     if (!keep) document.getSelection().removeAllRanges();
     const r = p.getClientRects()[0];
@@ -456,10 +478,13 @@ await send({
 });
 await waitFor('loaded', 30000);
 const r5 = await waitFor('relocate');
-console.log('reopen at cfi → fraction', r5.fraction.toFixed(3), '(expected ~', r4.fraction.toFixed(3), ')');
+console.log('reopen at cfi → fraction', r5.fraction.toFixed(3), '(expected ~', r4.fraction.toFixed(3), ')', r5.cfi === r4.cfi ? 'same cfi' : `cfi ${r5.cfi} vs ${r4.cfi}`);
 // Reopening switches to scrolled flow, which lays the section out differently; with one section per
-// page (PDF) a section is a large share of the book, so allow a section's worth of drift.
-if (Math.abs(r5.fraction - r4.fraction) > Math.max(0.02, 1 / loaded.sections)) throw new Error('did not restore position');
+// page (PDF) a section is a large share of the book, and sections differ in size, so allow a section
+// and a half of drift as long as it is the same section.
+const sameSection = r5.cfi?.split('!')[0] === r4.cfi?.split('!')[0];
+const drift = Math.abs(r5.fraction - r4.fraction);
+if (drift > Math.max(0.02, (sameSection ? 1.5 : 1) / loaded.sections)) throw new Error('did not restore position');
 
 // Books are untrusted: nothing a section carries (script elements, inline handlers, javascript: links)
 // may run. reader-web/test/scripted.epub sets a marker through each of those routes.

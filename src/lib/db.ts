@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { cleanTitle } from './editions';
 
 import type { Annotation, AppBookSummary } from './types';
 
@@ -120,7 +121,8 @@ export async function upsertBooks(books: AppBookSummary[]) {
   const db = await getDb();
   const now = Date.now();
   await db.withTransactionAsync(async () => {
-    for (const b of books) {
+    for (const raw of books) {
+      const b = { ...raw, title: cleanTitle(raw.title, raw.primaryFileName) };
       await db.runAsync(
         `INSERT OR REPLACE INTO books (id, json, title, authors, last_read_time, added_on, read_progress, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

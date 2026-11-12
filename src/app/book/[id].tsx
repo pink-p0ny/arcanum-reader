@@ -21,7 +21,7 @@ import { isOfflineError } from '@/lib/api';
 import { getProvider } from '@/lib/provider';
 import { getBook, getBooks, type LocalAnnotation } from '@/lib/db';
 import { deleteDownload, downloadBook, downloadsStore, formatBytes, localBookFile } from '@/lib/downloads';
-import { siblingEditions } from '@/lib/editions';
+import { cleanTitle, siblingEditions } from '@/lib/editions';
 import { decodeEntities, parseEpubMeta } from '@/lib/epub-meta';
 import { pickReadableFile } from '@/lib/formats';
 import { isFolderBook } from '@/lib/library-folder';
@@ -32,11 +32,26 @@ import type { AppBookDetail, AppBookSummary } from '@/lib/types';
 
 /** Blurbs arrive as HTML from servers (and sometimes HTML escaped twice); show them as plain paragraphs. */
 function stripHtml(s?: string) {
+  // Every block boundary becomes a break, not just </p>: blurbs come with headings, divs and lists, and
+  // "<h3>KATE, 2019</h3><p>Kate flees" would otherwise read "KATE, 2019Kate flees".
   const strip = (t: string) =>
-    t
+    rawBreaks(t)
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n\n')
-      .replace(/<[^>]+>/g, '');
+      .replace(/<hr\s*\/?>/gi, '\n\n')
+      .replace(/<\/(p|div|h[1-6]|li|ul|ol|blockquote|tr|table|section|article|header|footer|dd|dt|pre)>/gi, '\n\n')
+      .replace(/<(p|div|h[1-6]|li|blockquote|tr|section|article|header|footer|dd|dt|pre)\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/[ \t\u00a0]*\n[ \t\u00a0]*/g, '\n');
+  // Raw newlines mean different things: in HTML they are whitespace; in a plain-text blurb a blank line
+  // separates paragraphs and a single newline is a wrapped line ("On the\n heels of leaving").
+  const rawBreaks = (t: string) => {
+    const x = t.replace(/\r\n?/g, '\n');
+    if (/<[a-z][^>]*>/i.test(x)) return x.replace(/\s*\n\s*/g, ' ');
+    return x
+      .replace(/[ \t\u00a0]*\n[ \t\u00a0]*\n\s*/g, '\u2029')
+      .replace(/[ \t\u00a0]*\n[ \t\u00a0]*/g, ' ')
+      .replace(/\u2029/g, '\n\n');
+  };
   let text = decodeEntities(strip(s ?? ''));
   if (/<\/?(p|br|b|i|em|strong|div|span)\b/i.test(text)) text = decodeEntities(strip(text));
   return text.replace(/\n{3,}/g, '\n\n').trim();
@@ -88,8 +103,13 @@ export default function BookScreen() {
   });
   const dl = useStore(downloadsStore, (s) => s[bookId]);
 
+  // The detail call brings the server's raw title back; keep it as clean as the stored summary.
   const book: (AppBookSummary & Partial<AppBookDetail>) | null | undefined = detail.data
-    ? { ...(cached.data ?? {}), ...detail.data }
+    ? {
+        ...(cached.data ?? {}),
+        ...detail.data,
+        title: cleanTitle(detail.data.title, cached.data?.primaryFileName),
+      }
     : cached.data;
 
   // A server with no blurb for a book that carries one inside the EPUB: read it from the downloaded file.

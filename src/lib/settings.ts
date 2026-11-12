@@ -21,6 +21,8 @@ export interface ReaderSettings {
   hyphenate: boolean;
   /** PDFs with a text layer: rebuild the text as a reflowable book (true) or show the rendered pages. */
   pdfReflow: boolean;
+  /** Reflow scanned PDFs too (their text is OCR); off shows the original pages. */
+  pdfReflowScans: boolean;
   /** Comics: page order. 'auto' follows the archive's ComicInfo (manga reads right to left). */
   comicDirection: 'auto' | 'ltr' | 'rtl';
   ttsRate: number;
@@ -40,6 +42,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   justify: true,
   hyphenate: true,
   pdfReflow: true,
+  pdfReflowScans: false,
   comicDirection: 'auto',
   ttsRate: 1,
   ttsVoice: null,
@@ -93,6 +96,7 @@ export const DISPLAY_SETTING_KEYS = [
   'justify',
   'hyphenate',
   'pdfReflow',
+  'pdfReflowScans',
   'comicDirection',
 ] as const satisfies readonly (keyof ReaderSettings)[];
 

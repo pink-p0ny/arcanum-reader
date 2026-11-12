@@ -16,6 +16,13 @@ export interface ComicInfo {
   direction: 'auto' | 'ltr' | 'rtl';
 }
 
+/** What the reader learned about a PDF: text layer present, reflowing now, and whether it is a scan. */
+export interface PdfInfo {
+  text: boolean;
+  reflow: boolean;
+  scanned?: boolean;
+}
+
 export type ReaderEvent =
   | { type: 'ready' }
   | {
@@ -25,7 +32,7 @@ export type ReaderEvent =
       sections: number;
       fixed?: boolean;
       /** PDFs only: whether the file has text to reflow and which mode opened. */
-      pdf?: { text: boolean; reflow: boolean } | null;
+      pdf?: PdfInfo | null;
       /** Comics only: archive format, page count and the reading direction in use. */
       comic?: ComicInfo | null;
     }

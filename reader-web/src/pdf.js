@@ -165,6 +165,11 @@ async function loadPdf(file) {
   return { lib, pdf, book };
 }
 
+// OCR layers sometimes report a width that runs on past the word (to the next word box, or the end of
+// the line), which hides the gap before the next item and glues words together; no glyph is wider than
+// its em, so that is the ceiling.
+const itemWidth = (it, size) => Math.min(it.width ?? 0, Math.max(1, (it.str ?? '').length) * size);
+
 /** Lines of text on a page, top to bottom, from pdf.js text items. */
 async function pageLines(pdf, pageNumber) {
   const page = await pdf.getPage(pageNumber);
@@ -181,15 +186,23 @@ async function pageLines(pdf, pageNumber) {
       if (it.str)
         cur.text +=
           (gap > size * 0.15 && !cur.text.endsWith(' ') && !it.str.startsWith(' ') ? ' ' : '') + it.str;
-      cur.right = Math.max(cur.right, x + (it.width ?? 0));
+      cur.right = Math.max(cur.right, x + itemWidth(it, size));
       cur.size = Math.max(cur.size, size);
     } else {
-      cur = { text: it.str ?? '', x, y, right: x + (it.width ?? 0), size };
+      cur = { text: it.str ?? '', x, y, right: x + itemWidth(it, size), size };
       lines.push(cur);
     }
     if (it.hasEOL) cur = null;
   }
-  return lines.map((l) => ({ ...l, text: l.text.replace(/\s+/g, ' ').trim() })).filter((l) => l.text);
+  // OCR layers mark a line-end hyphenation with a soft hyphen (U+00AD, invisible when drawn) or a Unicode
+  // hyphen; make it the plain hyphen the paragraph builder joins on, and drop soft hyphens elsewhere.
+  const tidy = (t) =>
+    t
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[\u00ad\u2010\u2011]\s*$/, '-')
+      .replace(/\u00ad/g, '');
+  return lines.map((l) => ({ ...l, text: tidy(l.text) })).filter((l) => l.text);
 }
 
 const median = (xs) => {
@@ -213,9 +226,31 @@ function pageBlocks(lines, stats, running) {
     if (para && para.text) blocks.push(para);
     para = null;
   };
+  lines = lines.map((l) => ({ ...l }));
+  // A drop cap is one big letter on its own baseline; give it back to the paragraph it starts.
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (!/^[A-Za-z]$/.test(l.text) || l.size <= stats.size * 1.6) continue;
+    const next = lines[i + 1]?.text && /^[a-z]/.test(lines[i + 1].text) ? lines[i + 1] : null;
+    const before = !next && lines[i - 1]?.text && /^[a-z]/.test(lines[i - 1].text) ? lines[i - 1] : null;
+    const target = next ?? before;
+    if (!target) continue;
+    target.text = l.text + target.text;
+    lines.splice(i, 1);
+    i--;
+  }
+  // A running head sharing a line with other text (the chapter title on the facing page of a scan).
+  const heads = [...running].filter((r) => r.length >= 8);
   for (const line of lines) {
     const key = line.text.toLowerCase();
-    if (/^[\divxlc]+$/i.test(key) || running.has(key)) continue;
+    for (const r of heads) {
+      if (key.length > r.length && key.startsWith(r)) line.text = line.text.slice(r.length).trim();
+      else if (key.length > r.length && key.endsWith(r)) line.text = line.text.slice(0, -r.length).trim();
+    }
+  }
+  for (const line of lines) {
+    const key = line.text.toLowerCase();
+    if (!key || /^[\divxlc]+$/i.test(key) || running.has(key)) continue;
     const heading = line.size > stats.size * 1.25 && line.text.length < 90;
     if (heading) {
       push();
@@ -268,14 +303,73 @@ const renderHtml = (blocks, pageNumber) =>
     .map((b) => (b.heading ? `<h2>${esc(b.text)}</h2>` : `<p${b.cont ? ' class="cont"' : ''}>${esc(b.text)}</p>`))
     .join('\n')}</body></html>`;
 
-/**
- * Open a PDF. `reflow` asks for the text to be rebuilt as a reflowable book; a PDF with no text layer
- * (a scan) comes back as pages regardless. `book.pdf` reports what happened: `{ text, reflow }`.
- */
-export const makePDF = async (file, { reflow = false } = {}) => {
-  const { lib, pdf, book } = await loadPdf(file);
+const mulMatrix = (m, n) => [
+  m[0] * n[0] + m[1] * n[2],
+  m[0] * n[1] + m[1] * n[3],
+  m[2] * n[0] + m[3] * n[2],
+  m[2] * n[1] + m[3] * n[3],
+  m[4] * n[0] + m[5] * n[2] + n[4],
+  m[4] * n[1] + m[5] * n[3] + n[5],
+];
 
-  if (reflow) {
+const samplePages = (n) => [...new Set([1, 2, Math.ceil(n / 2), n].filter((p) => p >= 1 && p <= n))];
+
+/**
+ * True when the sampled pages are each one image covering the page: a scan, whether or not OCR text was
+ * laid over it. Images are painted into the unit square under the current transform, so its scale is
+ * the drawn size.
+ */
+async function isScanned(pdf, lib) {
+  const O = lib.OPS;
+  const paints = new Set([O.paintImageXObject, O.paintInlineImageXObject, O.paintJpegXObject].filter((x) => x != null));
+  let scans = 0;
+  const sample = samplePages(pdf.numPages);
+  for (const p of sample) {
+    const page = await pdf.getPage(p);
+    const { width, height } = page.getViewport({ scale: 1 });
+    const { fnArray, argsArray } = await page.getOperatorList();
+    let ctm = [1, 0, 0, 1, 0, 0];
+    const stack = [];
+    let full = false;
+    for (let i = 0; i < fnArray.length && !full; i++) {
+      const fn = fnArray[i];
+      if (fn === O.save) stack.push(ctm);
+      else if (fn === O.restore) ctm = stack.pop() ?? ctm;
+      else if (fn === O.transform) ctm = mulMatrix(argsArray[i], ctm);
+      else if (paints.has(fn)) {
+        const w = Math.hypot(ctm[0], ctm[1]);
+        const h = Math.hypot(ctm[2], ctm[3]);
+        if (w >= width * 0.7 && h >= height * 0.7) full = true;
+      }
+    }
+    if (full) scans++;
+  }
+  return scans >= Math.ceil(sample.length / 2);
+}
+
+/** Whether the sampled pages carry any text at all (a scan's OCR layer counts). */
+async function hasText(pdf) {
+  let chars = 0;
+  for (const p of samplePages(pdf.numPages)) {
+    for (const l of await pageLines(pdf, p)) chars += l.text.length;
+    if (chars > 50) return true;
+  }
+  return false;
+}
+
+/**
+ * Open a PDF. `reflow` asks for the text to be rebuilt as a reflowable book; a scan comes back as pages
+ * unless `reflowScans` says otherwise, and a PDF with no text layer always does. `book.pdf` reports what
+ * happened: `{ text, reflow, scanned }`.
+ */
+export const makePDF = async (file, { reflow = false, reflowScans = false } = {}) => {
+  const { lib, pdf, book } = await loadPdf(file);
+  const scanned = await isScanned(pdf, lib).catch((e) => {
+    console.warn('[reader] scan check failed', e);
+    return false;
+  });
+
+  if (scanned ? reflowScans : reflow) {
     const { pages, chars } = await reflowSections(pdf);
     if (chars > 200) {
       const urls = [];
@@ -291,7 +385,7 @@ export const makePDF = async (file, { reflow = false } = {}) => {
           linear: 'yes',
         };
       });
-      book.pdf = { text: true, reflow: true };
+      book.pdf = { text: true, reflow: true, scanned };
       const destroy = book.destroy;
       book.destroy = () => {
         for (const u of urls) URL.revokeObjectURL(u);
@@ -299,11 +393,11 @@ export const makePDF = async (file, { reflow = false } = {}) => {
       };
       return book;
     }
-    book.pdf = { text: false, reflow: false };
+    book.pdf = { text: false, reflow: false, scanned };
   }
 
   book.rendition = { layout: 'pre-paginated' };
-  book.pdf ??= { text: true, reflow: false };
+  book.pdf ??= { text: await hasText(pdf), reflow: false, scanned };
   book.sections = Array.from({ length: pdf.numPages }).map((_, i) => ({
     id: i,
     load: async () => {

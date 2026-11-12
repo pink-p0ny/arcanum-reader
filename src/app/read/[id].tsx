@@ -13,7 +13,7 @@ import {
   type ReaderEvent,
   type ReaderHandle,
   type TocItem,
-  type ComicInfo,
+  type ComicInfo, type PdfInfo,
 } from '@/components/reader/reader-webview';
 import { SelectionBar } from '@/components/reader/selection-bar';
 import { SettingsSheet } from '@/components/reader/settings-sheet';
@@ -25,6 +25,7 @@ import { Spacing } from '@/constants/theme';
 import { getProvider } from '@/lib/provider';
 import { getBook, kvSet, type LocalAnnotation } from '@/lib/db';
 import { downloadBook, downloadsStore, localBookFile } from '@/lib/downloads';
+import { cleanTitle } from '@/lib/editions';
 import { pickReadableFile } from '@/lib/formats';
 import { readerPageUri } from '@/lib/reader-asset';
 import { resolveReaderSettings } from '@/lib/reader-theme';
@@ -87,7 +88,7 @@ export default function ReadScreen() {
   /** Fixed-layout book (PDF pages, comics): page images, so no read-aloud. */
   const [fixed, setFixed] = useState(false);
   /** Open PDF: whether it has text and which mode is showing, for the settings sheet. */
-  const [pdf, setPdf] = useState<{ text: boolean; reflow: boolean } | null>(null);
+  const [pdf, setPdf] = useState<PdfInfo | null>(null);
   /** Open comic: format, pages and reading direction, for the settings sheet. */
   const [comic, setComic] = useState<ComicInfo | null>(null);
   const [showToc, setShowToc] = useState(false);
@@ -155,7 +156,7 @@ export default function ReadScreen() {
           fileUri: file.uri,
           fileName: pick.name,
           fileId,
-          title: detail?.title ?? summary?.title ?? '',
+          title: cleanTitle(detail?.title ?? summary?.title, pick.name ?? summary?.primaryFileName),
           position: jumpCfi ? { cfi: jumpCfi, href: null, fraction: position?.fraction ?? 0 } : position,
           annotations,
         });

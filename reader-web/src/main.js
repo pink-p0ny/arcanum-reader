@@ -84,7 +84,7 @@ async function open({ url, name, position, settings: s, annotations }) {
     const source = isTxt(file)
       ? await makeTxt(file)
       : (await isPdf(file))
-        ? await makePDF(file, { reflow: s.pdfReflow !== false })
+        ? await makePDF(file, { reflow: s.pdfReflow !== false, reflowScans: s.pdfReflowScans === true })
         : (await isComic(file))
           ? await makeComic(file, { direction: s.comicDirection ?? 'auto' })
           : file;
@@ -728,7 +728,7 @@ const handlers = {
   open,
   settings: ({ settings: s }) => {
     const pdf = view?.book?.pdf;
-    const wantReflow = s.pdfReflow !== false;
+    const wantReflow = pdf?.scanned ? s.pdfReflowScans === true : s.pdfReflow !== false;
     settings = s;
     applyHostColors(s);
     applyRendererSettings(s);

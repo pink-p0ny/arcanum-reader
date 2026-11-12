@@ -71,6 +71,29 @@ export function readMetadata(b: Pick<AppBookSummary, 'title' | 'authors'>): { ti
   return titleIsName && authors.length === 1 && authorIsNotName ? { title: first, authors: [title] } : { title, authors };
 }
 
+/**
+ * A title worth showing. Metadata sometimes carries a path or URL where the title should be (a text file
+ * printed to PDF keeps "file:///C|/Documents%20and%20Settings/.../THOUGHT.TXT" as its Title); the file
+ * name is better, and failing that the last segment of the path, decoded and without its extension.
+ */
+export function cleanTitle(title: string | null | undefined, fileName?: string | null): string {
+  const t = (title ?? '').trim();
+  const pathLike =
+    /^(file|https?|ftp):\/\//i.test(t) ||
+    /^[a-z]:[\\/]/i.test(t) ||
+    /%20/.test(t) ||
+    (/[\\/]/.test(t) && /\.(txt|pdf|docx?|rtf|html?|epub|mobi|azw3?|cb[zr])$/i.test(t));
+  if (t && !pathLike) return t;
+  const stem = (fileName ?? '').replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '').trim();
+  if (stem) return stem;
+  let seg = t.replace(/^.*[\\/|]/, '');
+  try {
+    seg = decodeURIComponent(seg);
+  } catch {}
+  seg = seg.replace(/\.[^.]+$/, '').replace(/[_+]+/g, ' ').trim();
+  return seg || t;
+}
+
 /** File name without its extension, when it is specific enough to identify a book ("Burn - Nevada Barr"). */
 export function fileStem(name: string | undefined): string | null {
   const stem = words((name ?? '').replace(/\.[^.]+$/, ''));

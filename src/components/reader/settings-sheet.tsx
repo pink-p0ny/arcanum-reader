@@ -2,7 +2,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'r
 import { useStore } from '@/lib/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { ComicInfo } from '@/components/reader/reader-webview';
+import type { ComicInfo, PdfInfo } from '@/components/reader/reader-webview';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,7 +21,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   /** Set while a PDF is open: whether it has text to reflow, and which mode is showing. */
-  pdf?: { text: boolean; reflow: boolean } | null;
+  pdf?: PdfInfo | null;
   /** Set while a comic is open: its format, pages and the reading direction in use. */
   comic?: ComicInfo | null;
 }
@@ -130,17 +130,21 @@ export function SettingsSheet({ visible, onClose, pdf, comic }: Props) {
               <View style={styles.row}>
                 <ThemedText style={styles.label}>Reflow PDF text</ThemedText>
                 <Switch
-                  value={pdf.text && s.pdfReflow}
+                  value={pdf.text && (pdf.scanned ? s.pdfReflowScans : s.pdfReflow)}
                   disabled={!pdf.text}
-                  onValueChange={(v) => set({ pdfReflow: v })}
+                  onValueChange={(v) => set(pdf.scanned ? { pdfReflowScans: v } : { pdfReflow: v })}
                 />
               </View>
               <ThemedText type="small" themeColor="textSecondary" style={styles.note}>
                 {!pdf.text
                   ? 'This PDF has no text layer, so its pages are shown as images.'
-                  : pdf.reflow
-                    ? 'The text is laid out like an ebook. Turn this off to see the original pages.'
-                    : 'Showing the original pages: font and spacing come from the file.'}
+                  : pdf.scanned
+                    ? pdf.reflow
+                      ? 'This PDF is a scan: the text comes from OCR, so expect odd breaks and missing letters. Turn this off to see the original pages.'
+                      : 'This PDF is a scan, so its original pages are shown. The OCR text underneath is used for search; turn this on to read it as an ebook.'
+                    : pdf.reflow
+                      ? 'The text is laid out like an ebook. Turn this off to see the original pages.'
+                      : 'Showing the original pages: font and spacing come from the file.'}
               </ThemedText>
             </>
           ) : null}

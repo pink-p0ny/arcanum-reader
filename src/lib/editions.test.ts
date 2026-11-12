@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { authorKey, collapseEditions, editionKey, readMetadata, siblingEditions } from './editions';
+import { authorKey, cleanTitle, collapseEditions, editionKey, readMetadata, siblingEditions } from './editions';
 import { cfiForPage, pageFromCfi, pickReadableFile, typeFromName } from './formats';
 import type { AppBookSummary } from './types';
 
@@ -218,5 +218,21 @@ describe('formats', () => {
     assert.equal(pageFromCfi('epubcfi(/6/24!/4/2)'), 12);
     assert.equal(pageFromCfi('epubcfi(/6/3)'), null);
     assert.equal(pageFromCfi(null), null);
+  });
+});
+
+describe('cleanTitle', () => {
+  it('keeps ordinary titles', () => {
+    assert.equal(cleanTitle('Business at the Speed of Thought'), 'Business at the Speed of Thought');
+    assert.equal(cleanTitle('  Dune  ', 'dune.epub'), 'Dune');
+    assert.equal(cleanTitle('Catch-22: A Novel', 'x.pdf'), 'Catch-22: A Novel');
+  });
+  it('replaces a path or URL with the file name, or its own last segment', () => {
+    const bad = 'file:///C|/Documents%20and%20Settings/Administrator/Desktop/GATES,%20BILL%20-%20BUSINESS%20AT%20THE%20SPEED%20OF%20THOUGHT.TXT';
+    assert.equal(cleanTitle(bad, 'Gates, Bill - Business at the Speed of Thought.pdf'), 'Gates, Bill - Business at the Speed of Thought');
+    assert.equal(cleanTitle(bad), 'GATES, BILL - BUSINESS AT THE SPEED OF THOUGHT');
+    assert.equal(cleanTitle('C:\\Users\\me\\My Book.docx', null), 'My Book');
+    assert.equal(cleanTitle('https://example.com/dl/the_road.epub'), 'the road');
+    assert.equal(cleanTitle('', 'Untitled Scan.pdf'), 'Untitled Scan');
   });
 });

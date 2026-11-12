@@ -20,8 +20,12 @@
   (`pageFromCfi`, servers get `pdfProgress`) and a position survives switching: `pdfReflow` (default, Reader
   Settings) pulls the text out with pdf.js and rebuilds paragraphs/headings as a reflowable book (highlights,
   search, read-aloud and every typography setting work; running heads and page numbers are dropped), while
-  pages mode renders each page to a canvas with a text layer (fixed layout: no highlights or read-aloud,
-  swipe handled in main.js). Scans get pages by default: `isScanned` in pdf.js samples four pages for one
+  pages mode renders each page with pdf.js and shows it as an `<img>` under a text layer (fixed layout: no
+  highlights or read-aloud, swipe handled in main.js). The page is drawn on a canvas in reader.html, where
+  pdf.js loaded its fonts, then handed to the page frame as a PNG blob: a canvas inside the frame gets a
+  0x0 box in iOS WebKit (adopted or created there) and never paints, although Chromium and desktop WebKit
+  show it, so pages mode only ever looked right off-device until this. A page that fails to draw posts an
+  `error`; the app keeps every reader error in kv `lastReaderError`. Scans get pages by default: `isScanned` in pdf.js samples four pages for one
   image covering the page (operator list + transform), and such a PDF reflows only with the separate
   `pdfReflowScans` setting (`READER_PDF_REFLOW_SCANS=1` in `test:reader`; `book.pdf.scanned` drives the
   settings-sheet copy); a PDF with no text layer always gets pages. Reflow repairs for OCR layers: soft

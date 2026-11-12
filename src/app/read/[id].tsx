@@ -290,13 +290,12 @@ export default function ReadScreen() {
           break;
         case 'error':
           console.warn('[reader]', e.message, e.stack ?? '');
-          if (!loaded || !pageLoaded.current) {
-            setLoadError(e.message);
-            // Kept for support: Settings can show it, and `sqlite3 grimmory.db` on a simulator reads it.
-            kvSet('lastReaderError', { message: e.message, stack: e.stack ?? null, at: new Date().toISOString() }).catch(
-              () => {},
-            );
-          } else if (/Could not read book file|not supported/i.test(e.message)) setLoadError(e.message);
+          // Kept for support: Settings can show it, and `sqlite3 grimmory.db` on a simulator reads it.
+          kvSet('lastReaderError', { message: e.message, stack: e.stack ?? null, at: new Date().toISOString() }).catch(
+            () => {},
+          );
+          if (!loaded || !pageLoaded.current) setLoadError(e.message);
+          else if (/Could not read book file|not supported/i.test(e.message)) setLoadError(e.message);
           break;
       }
     },

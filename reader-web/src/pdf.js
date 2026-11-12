@@ -47,19 +47,47 @@ async function pdfjs() {
   return loading;
 }
 
-const renderPage = async (lib, page, doc, zoom) => {
+// A page that fails to draw would otherwise stay blank in silence: the app keeps the last reader error.
+const renderPage = (lib, page, doc, zoom) =>
+  drawPage(lib, page, doc, zoom).catch((e) => {
+    console.warn('[reader] pdf page render failed', e);
+    globalThis.ReactNativeWebView?.postMessage(
+      JSON.stringify({ type: 'error', message: `PDF page ${page.pageNumber} did not render: ${e?.message ?? e}`, stack: e?.stack }),
+    );
+    throw e;
+  });
+
+const drawPage = async (lib, page, doc, zoom) => {
+  // The fixed-layout renderer re-lays out spreads and may ask for a frame it has already replaced.
+  if (!doc?.documentElement || !doc.querySelector('#canvas')) return;
   const scale = zoom * devicePixelRatio;
   doc.documentElement.style.transform = `scale(${1 / devicePixelRatio})`;
   doc.documentElement.style.transformOrigin = 'top left';
   doc.documentElement.style.setProperty('--scale-factor', scale);
   const viewport = page.getViewport({ scale });
 
-  // The canvas must belong to this document (where pdf.js loaded the fonts), then move into the frame.
+  // pdf.js draws with fonts it loaded into this document, so the page is rendered on a canvas here, then
+  // handed to the frame as an image: a canvas inside the page frame gets a 0x0 box in iOS WebKit (adopted
+  // or created there) and never paints, while an <img> lays out everywhere, as comic pages do.
   const canvas = document.createElement('canvas');
   canvas.height = viewport.height;
   canvas.width = viewport.width;
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-  doc.querySelector('#canvas').replaceChildren(doc.adoptNode(canvas));
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  canvas.width = 0; // release the bitmap
+  const img = doc.createElement('img');
+  img.width = viewport.width;
+  img.height = viewport.height;
+  img.alt = '';
+  img.decoding = 'sync';
+  img.style.display = 'block';
+  if (blob) {
+    img.src = URL.createObjectURL(blob);
+    img.addEventListener('load', () => URL.revokeObjectURL(img.src), { once: true });
+  }
+  const slot = doc.querySelector('#canvas');
+  for (const old of slot.querySelectorAll('img')) if (old.src.startsWith('blob:')) URL.revokeObjectURL(old.src);
+  slot.replaceChildren(img);
 
   const container = doc.querySelector('.textLayer');
   container.replaceChildren();
